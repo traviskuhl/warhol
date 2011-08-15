@@ -1,0 +1,649 @@
+#!/usr/bin/perl
+#
+#  warhol - warhol|cdn
+# =================================
+#  (c) Copyright Travis Kuhl 2011
+#  
+#
+# This is free software. You may redistribute copies of it under the terms of
+# the GNU General Public License <http://www.gnu.org/licenses/gpl.html>.
+# There is NO WARRANTY, to the extent permitted by law.
+#
+
+# package as warhol
+package Warhol;
+
+# things we need
+use POSIX;
+use JSON;
+use Digest::MD5 qw(md5_hex);
+use MIME::Base64;
+use Data::Dumper;
+use Getopt::Long qw(GetOptionsFromArray :config pass_through permute);
+use Archive::Tar;
+use Cwd qw(abs_path);
+use File::Spec::Functions qw(rel2abs updir);
+use File::Basename;
+use File::Temp qw/ tempfile tempdir /;
+use File::stat;
+use File::Copy;
+use File::Path qw/make_path/;
+use OAuth::Lite::Consumer;
+
+# version
+our $VERSION = "0.1";
+
+# start
+our $Warhol = new Warhol();
+
+# some consts
+use constant TYPE_CSS => 1;
+use constant TYPE_JS => 2;
+use constant TYPE_PNG => 3;
+use constant TYPE_GIF => 4;
+use constant TYPE_JPG => 5;
+
+# types
+use constant TYPES => {
+	TYPE_CSS => {"name" => "css", "ext" => ".css", "mime" => "text/css", "group" => "style"},
+	TYPE_JS => {"name" => "js", "ext" => ".js", "mime" => "text/javascript", "group" => "javascript"},
+	TYPE_PNG => {"name" => "png", "ext" => ".png", "mime" => "image/png", "group" => "images"},	
+	TYPE_GIF => {"name" => "gif", "ext" => ".gif", "mime" => "image/gif", "group" => "images"},	
+	TYPE_JPG => {"name" => "jpg", "ext" => ".jpg", "mime" => "image/jpg", "group" => "images"},		
+};
+
+
+##
+## @brief create a new instance
+##
+sub new {
+
+	# get the refrence
+	my($ref) = @_;
+
+	# define some stuff
+	my $self = {
+		
+		# holders
+		'args' => (),
+		'opts' => (),
+		
+		# temp dir
+		'tmp' => tempdir(CLEANUP => 0),
+	
+		# list of commands
+		'cmds' => {
+		
+			# !help
+			"help" => {
+				"func" => \&help,
+				"opts" => 0
+			},
+		
+			# !init
+			"init" => {
+				"func" => \&init,
+				"opts" => ["api=s","key=s","secret=s"]
+			},
+			
+			# !push
+			"push" => {
+				"func" => \&pub,
+				"opts" => ["private!","public!","interactive|i"]
+			}
+			
+		}	
+		
+	};
+
+	# bless and return me
+	bless($self);		
+	
+	
+	
+	# exec
+	$self->start();
+
+	# self
+ 	return $self;
+
+}
+
+
+##
+## @brief start the instance
+##
+sub start {
+	my $self = shift;	
+	
+	# check arg1 for our command
+	my $cmd = shift @ARGV || "help";
+	
+	# see if the command works
+	unless (exists $self->{cmds}->{$cmd}) {
+		$cmd = "help";
+	}
+	
+	# args
+	my @args = ();
+	my @cleaned = ();
+
+	# loop through args and find
+	# anything that isn't an opt
+	foreach my $a (@ARGV) {
+		if (substr($a,0,1) ne '-') {
+			push(@args, $a);
+		}
+		else {
+			push(@cleaned, $a);
+		}
+	}
+	
+	# vars holder
+	my %vars = ();
+	my @opts = (\@cleaned, \%vars);
+	
+	# send to getopts
+	GetOptionsFromArray((@opts,@{$self->{cmds}->{$cmd}->{opts}}));
+	
+	# globalize them
+	$self->{args} = \@args;
+	$self->{opts} = \%vars;
+
+	# call the func
+	$self->{cmds}->{$cmd}->{func}($self);
+
+}
+
+sub opt {my ($self, $name) = @_; return $self->{opts}->{$name} || undef; }
+sub arg {my ($self, $idx) = @_; return $self->{args}[$idx] || undef; }
+
+
+##
+## @brief show help message
+##
+sub help {
+	my $self = shift;
+
+	print "help!"; exit;
+
+}
+
+
+##
+## @brief init the tree for warhol
+##
+sub init {
+	my $self = shift;
+
+	# ask them for their key and secret
+	my $key = $self->opt('key') || _ask("OAuth Key:");
+	my $secret = $self->opt('secret') ||  _ask("OAuth Secret:");
+	my $project = _ask("Project Name: ");
+	my $def = _ask("Default visibility to Public [Y/n]: ", "Y");
+
+		# need all
+		unless($key && $secret && $project) {
+			_msg("You left out some required information."); exit;
+		}
+
+	# our config
+	my $config = { 
+		'key' => $key,
+		'secret' => $secret,
+		'visiblity' => (uc(substr($def,0,1)) eq 'Y' ? 'public' : 'private'),
+		"api" => "https://".($self->opt("api") || "warholcdn.com")."/"
+	};
+
+	# try to valid it
+	my $resp = $self->oauth("verify", {}, $config);
+	
+		# bad response
+		unless ($resp) {
+			_msg("Could not validate your OAuth information."); exit;
+		} 
+	
+		# already a project
+		if ( _in_array(\@{$resp->{projects}}, $project) ) {
+			_msg("You already have a project named '$project'."); exit;
+		}
+	
+	# add their username to config
+	$config->{username} = $resp->{username};
+	$config->{project} = $project;
+	
+	# root url
+	$config->{root} = {
+		"reg" => "a.warholcdn.com/$resp->{username}/$project/",
+		"ssl" => "s.warholcdn.com/$resp->{username}/$project/" 
+	};
+	
+	# make our dir 
+	mkdir("./.warhol");
+
+	# write our config
+	_file_put("./.warhol/config", to_json($config));
+	
+	# done
+	_msg(" Initiation Complete!\n Run `warhol push` to publish assets."); exit;
+	
+}
+
+##
+## @brief publish all static files to warhol 
+##			cmd is push
+##
+sub pub {
+	my $self = shift;
+	
+	# folder
+	my $folder = $self->arg(0) || ".";
+
+		# message
+		_msg("Starting Push for folder '$folder'");
+
+	# figure the config dir
+	# and load the config
+	my ($root, $config) = _config($folder);
+
+		_msg(" found configuration at '$root'");
+	
+	# build number
+	my $bid = time();
+
+	# find all assets in the folder
+	# and find the tree
+	my $assets = _search_dir($folder, ["*.css","*.js","*.png","*.jpg","*.gif"]);
+	my $tree = _search_dir($root, ["*.css","*.js","*.png","*.jpg","*.gif"]);
+	
+		# how many did we find
+		_msg(" found ".scalar(@$assets)." asset files in '$folder'");
+
+	# open the manifest
+	my $manifest = from_json( _file_get("$root/.warhol/manifest") || '{"files":{}, "style":{}, "javascript":{}, "images":{}}' );
+	
+	# css
+	my @css = ();
+
+	# now we know everything is in the manifest
+	# lets go through asset files that they want 
+	# to update and update the manifest
+	foreach my $file (@$assets) {
+		
+		# parse file
+		my $f = _parse_file($file, $root);
+			
+			_msg("  added $f->{type}->{name} file at '$f->{path}' to push");
+		
+		# local
+		my $m = $manifest->{files}->{$f->{id}} || {};
+		
+		# it's already there
+		if ( $m->{mtime} != $f->{mtime}) {		
+		
+			# make the name
+			my $name = $f->{name}."-".$bid.$f->{ext};
+		
+			# m
+			$m = {
+				'id' => $f->{id},
+				'bid' => $bid,
+				'name' => $name,
+				'path' => $f->{dir} . $name,
+				'mtime' => $f->{mtime},
+				'type' => $f->{type},
+				'visibility' => 'public'
+			};
+			
+		}
+		
+		# reset manifest
+		$manifest->{files}->{$f->{id}} = $m;
+		
+		# push fid into group
+		$manifest->{$f->{type}->{group}}->{$f->{id}} = 1; 
+
+		# make sure our dir exists in tmp
+		make_path($self->{tmp}.$f->{dir});
+			
+		# copy the file to the tmp dir
+		copy($file, $self->{tmp}.$m->{path});
+	
+		# is css
+		if ( $f->{type}->{name} eq 'css' ) {
+			push(@css, [$m, $f]);
+		}
+		
+	}
+	
+	# now loop through all files in the
+	# assets list and update any css files
+	# in the manifest
+	foreach my $file (@css) {	
+		
+		# split it
+		$f = $file->[0];
+		$m = $file->[1];
+			
+		# message
+		_msg("  processing css file $f->{path}");			
+			
+		# parse the css file with the manifest
+		my($parsed, @errors) = _parse_css($f->{full}, $root, $manifest);
+	
+			# errors
+			if ( $#errors > 0 ) {
+				_msg("   found $#errors in css file $f->	{name}");
+				map { _msg("    error: $_"); } @errors;
+			}
+			else {
+				_msg("    no errors found in '$f->{name}'. updating push file.");
+			}	
+	
+		# write it
+		_file_put($self->{tmp}.$m->{path}, $parsed);
+	
+	}
+	
+	# set our project
+	$manifest->{project} = $config->{project};
+	
+	# make it json
+	my $mf = to_json($manifest);
+
+	# write manifest to the config dir
+	_file_put("$root/.warhol/manifest", $mf);
+
+	# write manifest to tmp dir
+	_file_put("$self->{tmp}/.manifest", $mf);
+
+	# pwd
+	$pwd = getcwd();
+
+	# tar file
+	my $tf = "$bid.tar.gz";
+	
+	# move to our tmp dir
+	chdir($self->{tmp});
+
+	# write to tmp
+	`tar -czf $tf .`;
+
+	# send the to 
+	$resp = $self->oauth("build/$bid", {"file"=>encode_base64(_file_get($tf))}, $config);
+
+	# move back
+	chdir($pwd);
+
+	# what happened
+	if ($resp) {
+		_msg(("="x80));	
+		_msg("Success!!");
+		_msg("Build in progress. Reference id: $resp->{ref}");	
+		_msg("Builds usually finish in a few seconds. You'll get ");
+		_msg("an email when your build is complete and your files are ready");
+		_msg(("="x80));	
+	}
+	else {
+		_msg("Your build failed. Please visit the site for more information");
+	}
+
+}
+
+
+sub oauth {
+	my $self = shift;
+	my $ep = shift;
+	my $params = shift || {};
+	my $config = shift;
+	
+	# url
+	my $url = $config->{api} ."api/v1/". $ep;
+	
+	# start aouth consumer
+	my $consumer = OAuth::Lite::Consumer->new(
+		consumer_key       => $config->{key},
+		consumer_secret    => $config->{secret},
+		site               => $config->{api},
+		request_token_path => q{/api/v1/request_token},
+		access_token_path  => q{/api/v1/access_token},
+		authorize_path     => q{/api/v1/authorize},
+	);
+	
+    my $res = $consumer->request(
+        method => 'POST',
+        url    => $url,
+        token  => md5_hex($config->{key}.$config->{secret}),
+       	params => $params
+    );	
+
+	# what happened
+    if ($res->is_success) {
+    
+    	# json
+		my $j = from_json($res->content);
+		
+		# status
+		if ($j->{status} == 1)  {
+			return $j->{response};
+		}
+		else {
+			return 0;
+		}
+		
+    }
+    else {
+    	return 0;
+    }
+
+}
+
+
+
+## ==============
+##  helper funcs
+## ==============
+
+sub _slash_trim {
+	my $string = shift;
+   	$string =~ s/^\///;
+    $string =~ s/\/$//;
+	return $string;	
+}
+
+sub _f { my $folder = shift; $folder = "/"._slash_trim($folder)."/"; return ($folder eq "//" ? "/" : $folder); }
+
+sub _config {
+
+	# folder
+	my $folder = rel2abs(shift);
+
+	# is it in this dir
+	if (-e "$folder/.warhol/config") {
+		return (_f($folder), from_json(_file_get("$folder/.warhol/config")));
+	}
+
+	# stop
+	my $dir = dirname($folder);
+
+	# recurse until we find a .warhol dir
+	while (-d $dir && $dir ne "/") {
+		if ( -e $dir."/.warhol/config" ) {
+			return (_f($dir), from_json(_file_get("$dir/.warhol/config")));
+		}
+		else {
+			$dir = dirname($dir);
+		}
+	}
+
+	# no config
+	_msg("No configuration file found. Run:");
+	_msg("`warhol init` to configure.");
+	exit;
+	
+}
+
+sub _parse_css {
+	my $file = shift;
+	my $root = shift;
+	my $manifest = shift;
+
+	# errors
+	my @errors = ();
+
+	# css 
+	$css = _file_get($file);	
+	
+	# loop and fond
+	while($css =~ /url\(([^\)]+)\)/gi) {
+		
+		# oath
+		my $path = rel2abs($root.$1);
+		
+		# has to be a real file
+		if ( -e $path ) {
+	
+			# now lets parse that file
+			my $f = _parse_file($path, $root);
+			
+			# find it in manifest
+			if ( exists $manifest->{files}->{$f->{id}} ) {
+				
+				# replace with the current path
+				$css =~ s/$1/$manifest->{files}->{$f->{id}}->{path}/;
+				
+			}
+			else {
+				push(@error, "File '$1' does not exists in manifest");
+			}
+			
+		}
+
+	}
+	
+	# return 
+	return ($css, \@errors);
+
+}
+
+
+sub _parse_file {
+	my $file = shift;
+	my $root = shift;
+	
+	# stat our file
+	my $st = stat($file);
+
+	# parse the file
+	my ($name, $path, $suff) = fileparse($file, ('.css','.js','.png','.jpg','.gif'));
+
+	# remove the root
+	$path =~ s/$root//;
+
+	# type 
+	my %types = (
+		'.css'	=> TYPES->{TYPE_CSS},
+		'.js'	=> TYPES->{TYPE_JS},
+		'.png'	=> TYPES->{TYPE_PNG},
+		'.gif'	=> TYPES->{TYPE_GIF},
+		'.jpg'	=> TYPES->{TYPE_JPG}
+	);
+	
+	# fpath
+	my $fpath = _f($path) . $name . $suff;
+
+	# reutrn
+	return {
+		'id' => md5_hex($fpath),
+		'name' => $name,
+		'dir' => _f($path),
+		'path' => $fpath,
+		'type' => $types{$suff},
+		'full' => $file,
+		'ext' => $suff,
+		'stat' => $st,
+		'mtime' => $st->mtime
+	};
+
+}
+
+sub _search_dir {
+
+	# dir and glob
+	my $dir = shift;
+	my $name = shift;
+	my @found = ();
+
+	# act
+	my $act = "find $dir -type f -and \\( " . join(" -o ",map { "-name '$_'" } @$name)." \\)";
+
+	# glob me
+	my @f = map { rel2abs($_); } split(/\n/,`$act`);
+
+	# return 
+	return \@f;
+
+}
+
+sub _msg {
+	my $msg = shift;
+	my $status = shift;	
+
+	print $msg ."\n";
+}
+
+sub _ask {
+
+    # whas the question
+    my $q = shift;
+    my $d = shift;
+    my $p = shift;
+    
+    # ask it
+    print $q . " ";
+    
+    if ( $p ) {
+    	`stty -echo`;
+    }
+    
+    # wait for an answer
+    my $a = <STDIN>; chomp $a;
+
+    if ( $p ) {
+    	`stty echo`; print "\n";
+    }
+    
+    # give it back
+    return $a || $d;
+    
+}
+
+sub _file_get {
+
+	my ($file) = @_;
+
+	open(FH,$file);
+	my @f = <FH>;
+	close(FH);
+
+	return join("",@f);
+
+}
+
+sub _file_put {
+
+	my ($file,$content) = @_;
+
+	open(FH,">".$file) || fail("Could not write to $file");
+	print FH $content;
+	close(FH);
+
+}
+
+sub _in_array {
+    my ($arr,$search_for) = @_;
+    foreach my $value (@$arr) {
+        return 1 if $value eq $search_for;
+    }
+    return 0;
+}
