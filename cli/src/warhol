@@ -45,11 +45,11 @@ use constant TYPE_JPG => 5;
 
 # types
 use constant TYPES => {
-	TYPE_CSS => {"name" => "css", "ext" => ".css", "mime" => "text/css", "group" => "style"},
-	TYPE_JS => {"name" => "js", "ext" => ".js", "mime" => "text/javascript", "group" => "javascript"},
-	TYPE_PNG => {"name" => "png", "ext" => ".png", "mime" => "image/png", "group" => "images"},	
-	TYPE_GIF => {"name" => "gif", "ext" => ".gif", "mime" => "image/gif", "group" => "images"},	
-	TYPE_JPG => {"name" => "jpg", "ext" => ".jpg", "mime" => "image/jpg", "group" => "images"},		
+	TYPE_CSS => {"name" => "css", "ext" => ".css", "mime" => "text/css", "group" => "style", "id" => TYPE_CSS, "parseable" => 1},
+	TYPE_JS => {"name" => "js", "ext" => ".js", "mime" => "text/javascript", "group" => "javascript", "id" => TYPE_JS, "parseable" => 1},
+	TYPE_PNG => {"name" => "png", "ext" => ".png", "mime" => "image/png", "group" => "images", "id" => TYPE_PNG},	
+	TYPE_GIF => {"name" => "gif", "ext" => ".gif", "mime" => "image/gif", "group" => "images", "id" => TYPE_GIF},	
+	TYPE_JPG => {"name" => "jpg", "ext" => ".jpg", "mime" => "image/jpg", "group" => "images", "id" => TYPE_JPG},		
 };
 
 
@@ -214,8 +214,8 @@ sub init {
 	
 	# root url
 	$config->{root} = {
-		"reg" => "a.warholcdn.com/$resp->{username}/$project/",
-		"ssl" => "s.warholcdn.com/$resp->{username}/$project/" 
+		"http" => "a.warholcdn.com/$resp->{username}/$project/",
+		"https" => "s.warholcdn.com/$resp->{username}/$project/" 
 	};
 	
 	# make our dir 
@@ -263,7 +263,7 @@ sub pub {
 	my $manifest = from_json( _file_get("$root/.warhol/manifest") || '{"files":{}, "style":{}, "javascript":{}, "images":{}}' );
 	
 	# css
-	my @css = ();
+	my @parseable = ();
 
 	# now we know everything is in the manifest
 	# lets go through asset files that they want 
@@ -271,7 +271,7 @@ sub pub {
 	foreach my $file (@$assets) {
 		
 		# parse file
-		my $f = _parse_file($file, $root);
+		my ($f) = _parse_file($file, $root);
 			
 			_msg("  added $f->{type}->{name} file at '$f->{path}' to push");
 		
@@ -310,8 +310,8 @@ sub pub {
 		copy($file, $self->{tmp}.$m->{path});
 	
 		# is css
-		if ( $f->{type}->{name} eq 'css' ) {
-			push(@css, [$m, $f]);
+		if ( $f->{type}->{parseable}) {
+			push(@parseable, [$m, $f]);
 		}
 		
 	}
@@ -319,26 +319,37 @@ sub pub {
 	# now loop through all files in the
 	# assets list and update any css files
 	# in the manifest
-	foreach my $file (@css) {	
+	foreach my $file (@parseable) {	
 		
 		# split it
 		$f = $file->[0];
 		$m = $file->[1];
 			
 		# message
-		_msg("  processing css file $f->{path}");			
+		_msg("  processing parseable file $f->{path}");			
 			
 		# parse the css file with the manifest
-		my($parsed, @errors) = _parse_css($f->{full}, $root, $manifest);
+		my($parsed, $rollups, $errors) = _parser($m->{full}, $root, $manifest);
 	
 			# errors
 			if ( $#errors > 0 ) {
-				_msg("   found $#errors in css file $f->	{name}");
-				map { _msg("    error: $_"); } @errors;
+				_msg("   found $#errors:");
+				map { _msg("    $_"); } @$errors;
 			}
 			else {
-				_msg("    no errors found in '$f->{name}'. updating push file.");
+				_msg("    no errors found. updating push file.");
 			}	
+	
+			# add to any rollups
+			foreach $roll (@$rollups) {
+				
+				# create the rollup
+				$manifest->{rollups}->{$f->{type}->{group}}->{$roll} = () unless( exists $manifest->{rollups}->{$f->{type}->{group}}->{$roll} );
+				
+				# add this file
+				$manifest->{rollups}->{$f->{type}->{group}}->{$roll}{$m->{id}} = 1;
+				
+			}
 	
 		# write it
 		_file_put($self->{tmp}.$m->{path}, $parsed);
@@ -350,9 +361,6 @@ sub pub {
 	
 	# make it json
 	my $mf = to_json($manifest);
-
-	# write manifest to the config dir
-	_file_put("$root/.warhol/manifest", $mf);
 
 	# write manifest to tmp dir
 	_file_put("$self->{tmp}/.manifest", $mf);
@@ -374,6 +382,12 @@ sub pub {
 
 	# move back
 	chdir($pwd);
+	
+	# add our config to our manifest
+	$manifest->{config} = $config;
+	
+	# write manifest to the config dir
+	_file_put("$root/.warhol/manifest", to_json($manifest));	
 
 	# what happened
 	if ($resp) {
@@ -483,19 +497,56 @@ sub _config {
 	
 }
 
-sub _parse_css {
+sub _parse_file_settings {
+	my $str = shift;
+
+	# settings
+	my $settings = {};
+
+	# first line
+	while ($str =~ /\@warhol([^\n]+)/gi) {
+	
+		# match what to do
+		foreach $setting (split(/ /, $1)) {
+		
+			# split on =
+			my ($name, $val) = split(/\=/,$setting);
+			
+			# add the settings
+			$settings->{$name} = $val;
+			
+		}
+				
+	}	
+
+	# give back
+	return $settings;
+
+}
+
+sub _parser {
 	my $file = shift;
 	my $root = shift;
 	my $manifest = shift;
 
 	# errors
 	my @errors = ();
+	my @rollups = ();
 
 	# css 
-	$css = _file_get($file);	
+	$str = _file_get($file);	
 	
+	# settings
+	my $settings = _parse_file_settings($str);
+	
+		# set rollup
+		@rollups = split(/\,/, $settings->{rollup}) if exists $settings->{rollup};
+			
 	# loop and fond
-	while($css =~ /url\(([^\)]+)\)/gi) {
+	while($str =~ /url\(([^\)]+)\)/gi) {
+		
+		# does it have a http in it go to next
+		if ( substr($1, 0, 4) eq "http" ) { next; }
 		
 		# oath
 		my $path = rel2abs($root.$1);
@@ -504,13 +555,13 @@ sub _parse_css {
 		if ( -e $path ) {
 	
 			# now lets parse that file
-			my $f = _parse_file($path, $root);
+			my ($f) = _parse_file($path, $root);
 			
 			# find it in manifest
 			if ( exists $manifest->{files}->{$f->{id}} ) {
 				
 				# replace with the current path
-				$css =~ s/$1/$manifest->{files}->{$f->{id}}->{path}/;
+				$str =~ s/$1/$manifest->{files}->{$f->{id}}->{path}/;
 				
 			}
 			else {
@@ -522,7 +573,7 @@ sub _parse_css {
 	}
 	
 	# return 
-	return ($css, \@errors);
+	return ($str, \@rollups, \@errors);
 
 }
 
@@ -549,21 +600,24 @@ sub _parse_file {
 		'.jpg'	=> TYPES->{TYPE_JPG}
 	);
 	
+	# type
+	my $type = $types{$suff};
+	
 	# fpath
-	my $fpath = _f($path) . $name . $suff;
+	my $fpath = _f($path) . $name . $suff;	
 
 	# reutrn
-	return {
+	return ({
 		'id' => md5_hex($fpath),
 		'name' => $name,
 		'dir' => _f($path),
 		'path' => $fpath,
-		'type' => $types{$suff},
+		'type' => $type,
 		'full' => $file,
 		'ext' => $suff,
 		'stat' => $st,
 		'mtime' => $st->mtime
-	};
+	});
 
 }
 
