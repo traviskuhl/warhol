@@ -1,5 +1,6 @@
 <?php
 
+
 class Warhol {
 
 	// our type ids
@@ -17,12 +18,77 @@ class Warhol {
 		self::TYPE_GIF 	=> array("name" => "gif", "ext" => ".gif", "mime" => "image/gif", "group" => "images"),	
 		self::TYPE_JPG 	=> array("name" => "jpg", "ext" => ".jpg", "mime" => "image/jpg", "group" => "images"),		
 	);
+	
+	// vars
+	private $key, $secret, $oauth, $cache = false;
+	private $host = "warholcdn.com";
 
 	///
 	/// @brief 
 	///	
-	public static function init($config) {
+	public function __construct($config) {
 		
+		// api key and secret
+		foreach($config as $key => $val) {
+			if (property_exists($this, $key)) {
+				$this->$key = $val;
+			}
+		}
+		
+		// oauth consumer
+		$this->oauth = new OAuth($this->key, $this->secret, OAUTH_SIG_METHOD_HMACSHA1, OAUTH_AUTH_TYPE_AUTHORIZATION);		
+	
+	}
+	
+	
+	///
+	/// @brief __call
+	///
+	public function __call($name, $args) {
+	
+		// do we have a manifest
+		if (isset($this->_manifest)) {
+			return call_user_func_array(array($this->_manifest, $name), $args);
+		}
+	
+		// go get our latest build
+		$build = $this->request("build/latest");
+		
+			// check for cache settings
+	
+		// now build our manifest
+		$this->_manifest = new Warhol_Manifest($build['response']['build']['manifest']);
+		
+		// make our call
+		return call_user_func_array(array($this->_manifest, $name), $args);
+	
+	}
+
+	///
+	/// @brief send request to server
+	///
+	private function request($uri, $params=array(), $method="GET") {
+	
+		// set our token
+		$this->oauth->setToken(md5($this->key.$this->secret), $this->secret);
+	
+		// fetch
+		try {
+			$this->oauth->fetch("https://{$this->host}/api/v1/{$uri}", $params, $method);
+		} catch(OAuthException $E) {		
+			die($E->getMessage());
+		}
+		
+		// not the 200 we want w eshould stop
+		$resp = $this->oauth->getLastResponseInfo();
+			
+			// not 200
+			if ( $resp['http_code'] != 200 ) {
+				die("Bad response");
+			}
+		
+		// give json response
+		return json_decode($this->oauth->getLastResponse(), true);
 	
 	}
 
@@ -46,8 +112,8 @@ class Warhol {
 		}
 		
 		// they gave a root dir
-		if (isset($args['dir'])) {
-			$manifest = file_get_contents("{$args['dir']}/.warhol/manifest");
+		if (isset($args['folder'])) {
+			$manifest = file_get_contents("{$args['folder']}/.warhol/manifest");
 		}
 	
 		// else stop
@@ -59,6 +125,96 @@ class Warhol {
 		return new Warhol_Manifest(json_decode($manifest, true));
 
 	
+	}
+	
+	///
+	/// @brief server
+	/// 
+	public static function server($folder) {
+
+		// get the manifest from the folder
+		$manifest = self::parse(array('folder'=>$folder));
+		
+		// paht info
+		$path = explode("/", trim((isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : false),'/'));
+		$query = explode('&', (isset($_SERVER['QUERY_STRING']) ? $_SERVER['QUERY_STRING'] : ""));
+
+		// content
+		$content = array();
+		$mime = false;
+
+		// what's in the path
+		switch($path[0]) {
+		
+			// combo
+			case 'combo':
+								
+				// loop through and get them
+				foreach ($query as $item) {
+					if (strpos($item,'=') !== false) { continue; }										
+					$content[] = "/* $item */\n" . file_get_contents($folder . "/" . trim($item,"/"));					
+					$mime = (strpos($item,".css")!==false ? self::TYPE_CSS : self::TYPE_JS);
+				}
+			
+				// break
+				break;
+			
+			// rollup
+			case 'rollup':
+			
+				// rollups
+				$rollups = $manifest->rollups;
+					
+					// no rollups
+					if (!$rollups) { die; }
+					
+				// name
+				$name = $path[1];		
+				
+					
+				// rollup
+				$rollup = array();	
+							
+				// find the rollup in the manifest
+				if (isset($rollups['style']) AND array_key_exists($name, $rollups['style'])) {
+					$rollup = $rollups['style'][$name];
+					$mime = self::TYPE_CSS;
+				}
+
+				if (isset($rollups['javascript']) AND  array_key_exists($name, $rollups['javascript'])) {
+					$rollup = $rollups['javascript'][$name];
+					$mime = self::TYPE_JS;
+				}
+			
+				foreach ($rollup as $fid => $x) {
+					$file = $manifest->getFile($fid);										
+					$content[] = "/* {$file->name} */\n" . file_get_contents($folder.$file->static['path']);
+				}
+			
+				break;
+			
+			
+			// default
+			default:
+				$file = implode("/", $path);
+				$content[] = file_get_contents($folder."/".$file);							
+				$mime = (strpos($file,".css")!==false ? self::TYPE_CSS : self::TYPE_JS);				
+		
+		};
+
+		// header
+		header("Content-Type:{$mime}");
+		
+		// print content
+		exit(implode("\n\n", $content));
+		
+	}
+
+	///
+	/// @brief
+	///
+	public static function getFileId($path) {
+		return md5("/".trim($path,'/'));
 	}
 
 }
@@ -72,6 +228,7 @@ class Warhol_Manifest {
 	private $_manifest = false;
 	private $_http = false;
 	private $_https = false;
+	private $_files = array();
 
 	public function __construct($manifest) {
 	
@@ -83,23 +240,24 @@ class Warhol_Manifest {
 		$this->_https = $manifest['config']['root']['https'];
 		
 		// lets loop through and 
-		foreach ($manifest['files'] as $file) {
+		foreach ($manifest['files'] as $file) {		
+			$this->_files[$file['id']] = new Warhol_Manifest_Item($file, $this);		
 			switch($file['type']['id']) {
 			
 				// css
 				case Warhol::TYPE_CSS:
-					$this->_style[$file['id']] = new Warhol_Manifest_Item($file, $this); break; 
+					$this->_style[$file['id']] = $this->_files[$file['id']]; break; 
 					
 				// js
 				case Warhol::TYPE_JS:
-					$this->_javascript[$file['id']] = new Warhol_Manifest_Item($file, $this); break;
+					$this->_javascript[$file['id']] = $this->_files[$file['id']]; break;
 					
 				
 				// image
 				case Warhol::TYPE_PNG:
 				case Warhol::TYPE_JPG:
 				case Warhol::TYPE_GIF:
-					$this->_images[$file['id']] = new Warhol_Manifest_Item($file, $this); break;
+					$this->_images[$file['id']] = $this->_files[$file['id']]; break;
 					
 				// unknow
 				default:
@@ -109,27 +267,46 @@ class Warhol_Manifest {
 	
 	}
 	
+	public function getFile($fid) {
+	
+		return (array_key_exists($fid, $this->_files) ? $this->_files[$fid] : false );
+	}
+	
+	public function __get($name) {
+		return (array_key_exists($name, $this->_manifest) ? $this->_manifest[$name] : false );
+	}
+	
 	public function getManifest(){ 
 		return $this->_manifest;
 	}
 	
-	public function style() {	
+	public function getStyle() {	
 		return $this->_style;
 	}
 	
-	public function javascript() {
-	
+	public function getJavascript() {
+		return $this->_javascript;
 	}
 	
-	public function images() {
+	public function getImages() {
+		return $this->_images;
 	}
 	
-	public function combo($type=false, $ssl=false) {
+	public function getComboUrl($type=false, $files=false, $ssl=false) {
 		$items = ($type == TYPE_JS ? $this->_javascript : $this->_style );
 		return $this->getUrl(array(
 			'root' => "combo",
-			'paths' => array_map(function($item){ return $item['path']; }, $items);
+			'paths' => ($files ? $files : array_map(function($item){ return $item['path']; }, $items))
 		), $ssl);		
+	}
+
+	public function getRollupUrl($name, $type=false, $ssl=false) {
+		$items = ($type == TYPE_JS ? $this->_javascript : $this->_style );
+		return $this->getUrl("rollup/{$name}", $ssl);		
+	}
+	
+	public function getImageUrl($path, $cmds=array(), $ssl=false) {
+		return $this->getUrl("image/{$path}?".implode("&", array_map(function($k,$v){ return "{$k}=".urlencode($v); }, array_keys($cmds), $cmds)));
 	}
 	
 	public function getUrl($arg, $ssl=false) {
@@ -165,7 +342,16 @@ class Warhol_Manifest_Item {
 		return $this->_manifest->getUrl($this->path, $ssl);
 			
 	}
+	
+	public function getImageUrl($cmds=array(), $ssl) {
+		return $this->_manifest->getImageUrl($this->path, $cmds, $ssl);
+	}
 
+}
+
+// look for a wServer env
+if (getenv('wServer')) {
+	Warhol::server(getenv('wServer'));
 }
 
 

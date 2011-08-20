@@ -20,7 +20,6 @@ use Digest::MD5 qw(md5_hex);
 use MIME::Base64;
 use Data::Dumper;
 use Getopt::Long qw(GetOptionsFromArray :config pass_through permute);
-use Archive::Tar;
 use Cwd qw(abs_path);
 use File::Spec::Functions qw(rel2abs updir);
 use File::Basename;
@@ -85,11 +84,17 @@ sub new {
 				"func" => \&init,
 				"opts" => ["api=s","key=s","secret=s"]
 			},
+
+			# !commit
+			"commit" => {
+				"func" => \&commit,
+				"opts" => ["push","force"]
+			},
 			
 			# !push
 			"push" => {
-				"func" => \&pub,
-				"opts" => ["private!","public!","interactive|i"]
+				"func" => \&build,
+				"opts" => ["commit","force"]
 			}
 			
 		}	
@@ -97,9 +102,7 @@ sub new {
 	};
 
 	# bless and return me
-	bless($self);		
-	
-	
+	bless($self);			
 	
 	# exec
 	$self->start();
@@ -233,11 +236,14 @@ sub init {
 ## @brief publish all static files to warhol 
 ##			cmd is push
 ##
-sub pub {
+sub commit {
 	my $self = shift;
 	
 	# folder
 	my $folder = $self->arg(0) || ".";
+
+	# opts
+	my $force = $self->opt('force') || 0;
 
 		# message
 		_msg("Starting Push for folder '$folder'");
@@ -246,8 +252,107 @@ sub pub {
 	# and load the config
 	my ($root, $config) = _config($folder);
 
+		# found our config file
+		_msg(" found configuration at '$root'");	
+
+	# lets commit 
+	($manifest) = $self->_commit($folder, $root, $config, $force);	
+
+	# completed commit
+	_msg(" Commit Complete");
+
+	exit;
+
+}
+
+
+##
+## @brief publish all static files to warhol 
+##			cmd is push
+##
+sub build {
+	my $self = shift;
+	
+	# folder
+	my $folder = $self->arg(0) || ".";
+
+	# opts
+	my $commit = $self->opt('commit') || 0;
+	my $force = $self->opt('force') || 0;
+
+		# message
+		_msg("Starting Push for folder '$folder'");
+
+	# figure the config dir
+	# and load the config
+	my ($root, $config) = _config($folder);
+
+		# found our config file
 		_msg(" found configuration at '$root'");
 	
+	my $manifest;
+	
+	# should we commit
+	if ($commit) {
+		$manifest = $self->_commit($folder, $root, $config, $force);
+	}
+	else {
+	
+		# check for a manifest
+		unless ( -e "$root/.warhol/manifest" ){
+			_msg(" could not find manifest! Run `warhol commit .` first."); exit;
+		}
+
+		unless ( -e "$root/.warhol/build" ){
+			_msg(" could not find a commit file! Run `warhol commit .` first."); exit;
+		}
+	
+		# found our config file
+		_msg(" found manifest file at '$root'");	
+	
+		# find the manifest
+		$manifest = from_json(_file_get("$root/.warhol/manifest"));	
+
+	}
+	
+	# found our config file
+	_msg(" found commit file at '$root'");	
+	
+	# send the to 
+	my $resp = $self->oauth("build/$bid", {"file"=>encode_base64(_file_get($root.".warhol/build"))}, $config);
+
+	# what happened
+	if ($resp) {
+	
+		# remove the build file
+		unlink($root.".warhol/build");
+		
+		# message
+		_msg(("="x80));	
+		_msg("Success!!");
+		_msg("Build in progress. Reference id: $resp->{ref}");	
+		_msg("Builds usually finish in a few seconds. You'll get ");
+		_msg("an email when your build is complete and your files are ready");
+		_msg(("="x80));	
+		
+	}
+	else {
+		_msg("Your build failed. Please visit the site for more information");
+	}
+
+}
+
+##
+## @brief publish all static files to warhol 
+##			cmd is push
+##
+sub _commit {
+	my $self = shift;
+	my $folder = shift;
+	my $root = shift;
+	my $config = shift;
+	my $force = shift || 0;
+
 	# build number
 	my $bid = time();
 
@@ -292,7 +397,12 @@ sub pub {
 				'path' => $f->{dir} . $name,
 				'mtime' => $f->{mtime},
 				'type' => $f->{type},
-				'visibility' => 'public'
+				'visibility' => 'public',
+				'static' => {
+					'name' => $f->{name}.$f->{ext},
+					'path' => $f->{path},
+					'dir' => $f->{dir}
+				}
 			};
 			
 		}
@@ -354,16 +464,19 @@ sub pub {
 		# write it
 		_file_put($self->{tmp}.$m->{path}, $parsed);
 	
-	}
+	}		
 	
 	# set our project
 	$manifest->{project} = $config->{project};
-	
-	# make it json
-	my $mf = to_json($manifest);
 
 	# write manifest to tmp dir
-	_file_put("$self->{tmp}/.manifest", $mf);
+	_file_put("$self->{tmp}/.manifest", to_json($manifest));
+
+	# add our config to our manifest
+	$manifest->{config} = $config;
+	
+	# write manifest to the config dir
+	_file_put("$root/.warhol/manifest", to_json($manifest));	
 
 	# pwd
 	$pwd = getcwd();
@@ -377,30 +490,14 @@ sub pub {
 	# write to tmp
 	`tar -czf $tf .`;
 
-	# send the to 
-	$resp = $self->oauth("build/$bid", {"file"=>encode_base64(_file_get($tf))}, $config);
-
-	# move back
-	chdir($pwd);
+	# move tmpfile to root
+	system("mv $tf ".$root.".warhol/build");
 	
-	# add our config to our manifest
-	$manifest->{config} = $config;
+	# go back
+	chdir($pwd);	
 	
-	# write manifest to the config dir
-	_file_put("$root/.warhol/manifest", to_json($manifest));	
-
-	# what happened
-	if ($resp) {
-		_msg(("="x80));	
-		_msg("Success!!");
-		_msg("Build in progress. Reference id: $resp->{ref}");	
-		_msg("Builds usually finish in a few seconds. You'll get ");
-		_msg("an email when your build is complete and your files are ready");
-		_msg(("="x80));	
-	}
-	else {
-		_msg("Your build failed. Please visit the site for more information");
-	}
+	# return
+	return $manifest;
 
 }
 
@@ -427,9 +524,13 @@ sub oauth {
     my $res = $consumer->request(
         method => 'POST',
         url    => $url,
-        token  => md5_hex($config->{key}.$config->{secret}),
+        token  => OAuth::Lite::Token->new(
+			token  => md5_hex($config->{key}.$config->{secret}),
+			secret => $config->{secret},
+    	),
        	params => $params
     );	
+  
 
 	# what happened
     if ($res->is_success) {
