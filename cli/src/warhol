@@ -20,8 +20,8 @@ use Digest::MD5 qw(md5_hex);
 use MIME::Base64;
 use Data::Dumper;
 use Getopt::Long qw(GetOptionsFromArray :config pass_through permute);
-use Cwd qw(abs_path);
-use File::Spec::Functions qw(rel2abs updir);
+use Cwd qw(abs_path realpath);
+use File::Spec::Functions qw(rel2abs abs2rel updir);
 use File::Basename;
 use File::Temp qw/ tempfile tempdir /;
 use File::stat;
@@ -75,25 +75,25 @@ sub new {
 		
 			# !help
 			"help" => {
-				"func" => \&help,
+				"func" => \&cmd_help,
 				"opts" => 0
 			},
 		
 			# !init
 			"init" => {
-				"func" => \&init,
+				"func" => \&cmd_init,
 				"opts" => ["api=s","key=s","secret=s"]
 			},
 
 			# !commit
 			"commit" => {
-				"func" => \&commit,
-				"opts" => ["push","force"]
+				"func" => \&cmd_commit,
+				"opts" => ["push","fresh"]
 			},
 			
 			# !push
 			"push" => {
-				"func" => \&build,
+				"func" => \&cmd_push,
 				"opts" => ["commit","force"]
 			}
 			
@@ -165,7 +165,7 @@ sub arg {my ($self, $idx) = @_; return $self->{args}[$idx] || undef; }
 ##
 ## @brief show help message
 ##
-sub help {
+sub cmd_help {
 	my $self = shift;
 
 	print "help!"; exit;
@@ -176,7 +176,7 @@ sub help {
 ##
 ## @brief init the tree for warhol
 ##
-sub init {
+sub cmd_init {
 	my $self = shift;
 
 	# ask them for their key and secret
@@ -218,7 +218,7 @@ sub init {
 	# root url
 	$config->{root} = {
 		"http" => "a.warholcdn.com/$resp->{username}/$project/",
-		"https" => "s.warholcdn.com/$resp->{username}/$project/" 
+		"https" => "$resp->{ssl}/$resp->{username}/$project/" 
 	};
 	
 	# make our dir 
@@ -236,7 +236,7 @@ sub init {
 ## @brief publish all static files to warhol 
 ##			cmd is push
 ##
-sub commit {
+sub cmd_commit {
 	my $self = shift;
 	
 	# folder
@@ -256,7 +256,7 @@ sub commit {
 		_msg(" found configuration at '$root'");	
 
 	# lets commit 
-	($manifest) = $self->_commit($folder, $root, $config, $force);	
+	($manifest) = $self->commit($folder, $root, $config, $force);	
 
 	# completed commit
 	_msg(" Commit Complete");
@@ -270,7 +270,7 @@ sub commit {
 ## @brief publish all static files to warhol 
 ##			cmd is push
 ##
-sub build {
+sub cmd_push {
 	my $self = shift;
 	
 	# folder
@@ -294,12 +294,12 @@ sub build {
 	
 	# should we commit
 	if ($commit) {
-		$manifest = $self->_commit($folder, $root, $config, $force);
+		$manifest = $self->commit($folder, $root, $config, $force);
 	}
 	else {
 	
 		# check for a manifest
-		unless ( -e "$root/.warhol/manifest" ){
+		unless ( -e "$root/.warhol/build.manifest" ){
 			_msg(" could not find manifest! Run `warhol commit .` first."); exit;
 		}
 
@@ -311,29 +311,68 @@ sub build {
 		_msg(" found manifest file at '$root'");	
 	
 		# find the manifest
-		$manifest = from_json(_file_get("$root/.warhol/manifest"));	
+		$manifest = from_json(_file_get("$root/.warhol/build.manifest"));	
 
 	}
 	
 	# found our config file
 	_msg(" found commit file at '$root'");	
 	
+	# sending
+	_msg(" sending commit file to $config->{api}...");	
+	
 	# send the to 
-	my $resp = $self->oauth("build/$bid", {"file"=>encode_base64(_file_get($root.".warhol/build"))}, $config);
+	my $resp = $self->oauth("build", {"file"=>encode_base64(_file_get($root.".warhol/build"))}, $config);
+
+	# sending
+	_msg(" send done... processing response.");	
 
 	# what happened
 	if ($resp) {
-	
+
 		# remove the build file
 		unlink($root.".warhol/build");
+		unlink($root.".warhol/build.manifest");
+	
+		# write manifest to the config dir
+		_file_put("$root/.warhol/manifest", to_json($manifest));		
+	
+		# build has been queued
+		if ( exists $resp->{queued} && $res->{queued} == 1 ) {
+			
+			# message
+			_msg(("="x80));	
+			_msg("Success!!");
+			_msg("Build in progress. Reference id: $resp->{ref}");	
+			_msg("Builds usually finish in a few seconds. You'll get ");
+			_msg("an email when your build is complete and your files are ready");
+			_msg(("="x80));	
+			
+		}
 		
-		# message
-		_msg(("="x80));	
-		_msg("Success!!");
-		_msg("Build in progress. Reference id: $resp->{ref}");	
-		_msg("Builds usually finish in a few seconds. You'll get ");
-		_msg("an email when your build is complete and your files are ready");
-		_msg(("="x80));	
+		# build is already done and ready to go
+		elsif ( exists $resp->{success} && $resp->{success} == 1 ){
+		
+			# message
+			_msg(("="x80));	
+			_msg("Success!!");
+			_msg("Build in complete and ready to use.");
+			_msg("Reference id: $resp->{ref}");	
+			_msg(("="x80));			
+		
+		}	
+		
+		# build failed
+		else {
+		
+			# message
+			_msg(("="x80));	
+			_msg("Fail!!");
+			_msg("Your build did not complete. Error:");
+			_msg("$resp->{error}");	
+			_msg(("="x80));			
+		
+		}				
 		
 	}
 	else {
@@ -346,7 +385,7 @@ sub build {
 ## @brief publish all static files to warhol 
 ##			cmd is push
 ##
-sub _commit {
+sub commit {
 	my $self = shift;
 	my $folder = shift;
 	my $root = shift;
@@ -367,6 +406,11 @@ sub _commit {
 	# open the manifest
 	my $manifest = from_json( _file_get("$root/.warhol/manifest") || '{"files":{}, "style":{}, "javascript":{}, "images":{}}' );
 	
+		# if fresh, we can like the manifest doesn't exisst
+		if ( $self->opt('fresh') ) {
+			$manifest = { "files" => {}, "style" => {}, "javascript" => {}, "images" => {}};
+		}
+	
 	# css
 	my @parseable = ();
 
@@ -377,14 +421,18 @@ sub _commit {
 		
 		# parse file
 		my ($f) = _parse_file($file, $root);
-			
-			_msg("  added $f->{type}->{name} file at '$f->{path}' to push");
+
+			# add to build
+			_msg("  found $f->{type}->{name} at '$f->{path}'");			
 		
 		# local
 		my $m = $manifest->{files}->{$f->{id}} || {};
 		
 		# it's already there
-		if ( $m->{mtime} != $f->{mtime}) {		
+		if ( $m->{mtime} != $f->{mtime} || $f->{type}->{parseable}) {	
+		
+			# add to build
+			_msg("   added $f->{type}->{name} file at '$f->{path}' to push. ".($m->{mtime}-$m->{mtime})." sec diff");			
 		
 			# make the name
 			my $name = $f->{name}."-".$bid.$f->{ext};
@@ -420,7 +468,7 @@ sub _commit {
 		copy($file, $self->{tmp}.$m->{path});
 	
 		# is css
-		if ( $f->{type}->{parseable}) {
+		if ( $f->{type}->{parseable} ) {
 			push(@parseable, [$m, $f]);
 		}
 		
@@ -432,14 +480,14 @@ sub _commit {
 	foreach my $file (@parseable) {	
 		
 		# split it
-		$f = $file->[0];
-		$m = $file->[1];
+		$m = $file->[0];
+		$f = $file->[1];
 			
 		# message
 		_msg("  processing parseable file $f->{path}");			
 			
 		# parse the css file with the manifest
-		my($parsed, $rollups, $errors) = _parser($m->{full}, $root, $manifest);
+		my($parsed, $rollups, $errors) = _parser($f->{full}, $root, $manifest);
 	
 			# errors
 			if ( $#errors > 0 ) {
@@ -469,14 +517,20 @@ sub _commit {
 	# set our project
 	$manifest->{project} = $config->{project};
 
+	# bid 
+	$manifest->{bid} = $bid;
+
 	# write manifest to tmp dir
 	_file_put("$self->{tmp}/.manifest", to_json($manifest));
 
 	# add our config to our manifest
 	$manifest->{config} = $config;
 	
+	# remove bid
+	delete $manifest->{bid};
+	
 	# write manifest to the config dir
-	_file_put("$root/.warhol/manifest", to_json($manifest));	
+	_file_put("$root/.warhol/build.manifest", to_json($manifest));	
 
 	# pwd
 	$pwd = getcwd();
@@ -530,8 +584,10 @@ sub oauth {
     	),
        	params => $params
     );	
-  
 
+
+#	print Dumper($res->content); die;	
+	
 	# what happened
     if ($res->is_success) {
     
@@ -633,6 +689,12 @@ sub _parser {
 	# errors
 	my @errors = ();
 	my @rollups = ();
+	
+	# parse the file
+	my ($name, $rpath) = fileparse($file, ('.css','.js'));	
+	
+		# no name rturn
+		unless($name) { return ($str, \@rollups, \@errors); }
 
 	# css 
 	$str = _file_get($file);	
@@ -645,24 +707,33 @@ sub _parser {
 			
 	# loop and fond
 	while($str =~ /url\(([^\)]+)\)/gi) {
-		
+				
 		# does it have a http in it go to next
 		if ( substr($1, 0, 4) eq "http" ) { next; }
 		
 		# oath
-		my $path = rel2abs($root.$1);
+		my $path = realpath($rpath.$1);
 		
 		# has to be a real file
 		if ( -e $path ) {
-	
+		
 			# now lets parse that file
 			my ($f) = _parse_file($path, $root);
 			
 			# find it in manifest
 			if ( exists $manifest->{files}->{$f->{id}} ) {
+			
+				# man ifle
+				my $mf = $manifest->{files}->{$f->{id}};
+			
+				# replace the static name
+				my $rep = $found = $1;
+				
+				# replace the name
+				$rep =~ s/$mf->{static}->{name}/$mf->{name}/;			
 				
 				# replace with the current path
-				$str =~ s/$1/$manifest->{files}->{$f->{id}}->{path}/;
+				$str =~ s/$found/$rep/;	
 				
 			}
 			else {
@@ -680,8 +751,8 @@ sub _parser {
 
 
 sub _parse_file {
-	my $file = shift;
-	my $root = shift;
+	my $file = realpath(shift);
+	my $root = realpath(shift);
 	
 	# stat our file
 	my $st = stat($file);
