@@ -10,7 +10,19 @@ command line client for [warholcdn.com](http://warholcdn.com)
  * OAuth::Lite::Consumer
 
 # Install
+
+## The Installer
 1. Download the installer `curl -sL http://warholcdn.com/install.pl | perl`
+
+## Old School
+1. Download the tar `curl -L http://warholcdn.com/install/download > warhol.tar`
+2. Unpack the tar `tar -xzf warhol.tar`
+3. Move the script to your favorite `bin` directory `mv warhol /you/fav/bin/dir`
+
+## From GitHub using drib
+1. Clone the repo `git clone git://github.com/traviskuhl/warhol.git`
+2. Move into warhol `cd warhol/`
+3. Install a dev build `drib create -t s -i -c`
 
 # Usage
 `warhol [options] command`
@@ -24,10 +36,12 @@ command line client for [warholcdn.com](http://warholcdn.com)
 	
 # Examples
 
-** Create an Asset Folder **
+## Create an Asset Folder
+	
 	warhol init . --key="{$apiKey}" --secret="{$apiSecret}"
 	
-** Push asset folder **
+## Push asset folder
+	
 	warhol push .
 	
 	

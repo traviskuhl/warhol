@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-#  wargolcdn
+#  warholcnd/install.pl
 # =================================
 #  (c) Copyright the.kuhl.co llc 2011
 #  
@@ -12,13 +12,18 @@
 
 use File::Temp qw/ tempdir /;
 use POSIX;
-use FindBin qw($Bin);
+use Data::Dumper;
+use File::Basename;
+
+# where to place it
+# the same place we place perl
+my $Bin = dirname(`which perl`);
 
 # temp dir
 my $tmp = tempdir();
 
 # pull down the latest tar from our src
-`curl https://$(host)/install/download/current.tar > $tmp/current.tar`;
+`curl -sLk https://$(host)/install/download/current.tar > $tmp/current.tar`;
 
 # wd
 my $pwd = getcwd();
@@ -33,4 +38,8 @@ chdir($tmp);
 `mv warhol $Bin`;
 
 # and done
-print "Done!\n";
+print "="x50;
+print "\n Installation Complete!\n Create a new asset folder with `warhol init .`\n";
+print "\b https://warholcdn.com/docs\n";
+print "="x50;
+print "\n";
