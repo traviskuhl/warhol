@@ -4,20 +4,20 @@ https://warholcdn.com
 # Clients
 Feel free to fork and submit a pull request if you'd like to add a client for your favorite language
 
-* [Command Line](./tree/master/cli) - command line client for pushing conent to the server
-* [PHP](./tree/master/php) - php wrapper for the warhol|cdn api
+* [Command Line](tree/master/cli) - command line client for pushing conent to the server
+* [PHP](tree/master/php) - php wrapper for the warhol|cdn api
 
 
 # Documentation
 Full documentation is available in the docs/ folder
 
-* [Getting Started](./tree/master/docs/getting_started.md)
-* [Asset Serving](./tree/master/docs/asset_serving.md)
-* [API Docs](./tree/master/docs/api.md)
-* [Development Process](./tree/master/docs/process.md)
+* [API Docs](tree/master/docs/api.md)
+* [Getting Started](tree/master/docs/getting_started.md)
+* [Asset Serving](tree/master/docs/asset_serving.md)
+* [Development Process](tree/master/docs/process.md)
 
 # Get Help
-* IRC: [#warholcdn](irc://irc.oftc.net/#warholcdn) - irc://irc.oftc.net/#warholcdn
+* IRC: [irc://irc.oftc.net/#warholcdn](irc://irc.oftc.net/#warholcdn)
 * Email: [info@kuhl.co](info@kuhl.co)
 * Twitter: [@kuhlco](http://twitter.com/#!/kuhlco) or [@traviskuhl](http://twitter.com/#!/traviskuhl) or [@rochers](http://twitter.com/#!/rochers)
 * Bugs: [github issues](https://github.com/traviskuhl/warhol/issues)
