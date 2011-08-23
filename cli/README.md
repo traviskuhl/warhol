@@ -4,12 +4,13 @@ command line client for [warholcdn.com](http://warholcdn.com)
 # Requirements
 * Perl v5.8.8
 * CPAN Modules
- * JSON;
- * Digest::MD5 qw(md5_hex);
- * MIME::Base64;	
+ * JSON
+ * Digest::MD5
+ * MIME::Base64
+ * OAuth::Lite::Consumer
 
 # Install
-1. Download the installer `curl http://warholcdn.com/install.sh | sh`
+1. Download the installer `curl -sL http://warholcdn.com/install.pl | perl`
 
 # Usage
 `warhol [options] command`
@@ -31,14 +32,13 @@ command line client for [warholcdn.com](http://warholcdn.com)
 	
 	
 # Get Help
-* IRC: [#dribpdm](irc://irc.oftc.net/#warholcdn) - irc://irc.oftc.net/#warholcdn
-* Bugs: [github issues](https://github.com/traviskuhl/warhol/issues)
+* IRC: [#warholcdn](irc://irc.oftc.net/#warholcdn) - irc://irc.oftc.net/#warholcdn
+* Bugs: [github issues](https://github.com/traviskuhl/warhol/issues?labels=cli)
 
 # LICENSE
-
 The MIT License
 
-Copyright (c) 2009-2011 Travis Kuhl travis@kuhl.co
+Copyright (c) 2011 the.kuhl.co llc
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
