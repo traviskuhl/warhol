@@ -1,8 +1,0 @@
-/* @warhol rollup=global,single */
-
-#poop {color:red;}
-
-
-body {
- background-image: url(f4.jpg);
-}

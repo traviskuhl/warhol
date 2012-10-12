@@ -1,0 +1,165 @@
+#!/usr/bin/php
+<?php
+
+// tar
+require "Archive/Tar.php";
+
+date_default_timezone_set("UTC");
+
+// phar
+$phar = new Phar('warhol.phar', 0, 'warhol.phar');
+
+// phar
+$phar->setSignatureAlgorithm(Phar::SHA1);
+
+// buffering
+$phar->startBuffering();
+
+// find out the version
+list($sha, $date, $ts) = explode("|", trim(`git log --pretty="%h|%ci|%ct" -n1 `));
+
+// version
+$version = $sha;
+
+// lets get our files
+$dir = new RecursiveDirectoryIterator('../lib/');
+$it = new RecursiveIteratorIterator($dir);
+$regex = new RegexIterator($it, '/^.+\.php$/i', RecursiveRegexIterator::GET_MATCH);
+
+// add our files
+foreach (iterator_to_array($regex) as $file) {
+	
+	// path - ../lib
+	$path = str_replace("../lib/", "", $file[0]);
+
+	// drop some white space
+	$content = stripWhitespace(file_get_contents($file[0]));
+
+	// version
+	$content = preg_replace("/const VERSION = '.*?';/", "const VERSION = '".$version."';", $content);
+
+	// add it 
+	$phar->addFromString($path, $content);
+
+}
+
+// other files
+$phar->addFromString("LICENSE", file_get_contents("../LICENSE"));
+
+// stub
+$phar->setStub(stub($sha, $date, $ts));
+
+// DONE
+$phar->stopBuffering();
+
+// no phar
+unset($phar);
+
+// chmod 
+chmod("warhol.phar", 0755);
+
+// create a 
+$tar = new Archive_Tar("../builds/warhol-$version.tar.gz", 'gz');
+
+// create
+$tar->create(array("./warhol.phar","../LICENSE","../README"));
+
+// copy to latest
+copy("../builds/warhol-$version.tar.gz", "../builds/warhol-latest.tar.gz");
+
+// remove
+unlink("warhol.phar");
+
+// goodbye sucka
+exit("DONE!\n\n");
+
+
+function stub($sha, $date, $ts) {
+$str = '#!/usr/bin/env php
+<?php
+///////////////////////////////////////////////////////////////////////
+/// (c) travis kuhl 2012 - author: travis kuhl (travis@kuhl.co)
+/// 
+/// Licensed under the Apache License, Version 2.0 (the "License"); 
+/// you may not use this work except in  compliance with the License. 
+/// You may obtain a copy of the License in the LICENSE file, or at:
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+/// 
+/// Unless required by applicable law or agreed to in writing, 
+/// software distributed under the License is distributed on an "AS IS" 
+/// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either 
+/// express or implied. See the License for the specific language 
+/// governing permissions and limitations under the License.
+///////////////////////////////////////////////////////////////////////
+/// Build: '.$sha.' / '.$date.'
+/// Compiled: '.date('r').'
+
+
+';
+
+$str .= <<<'END'
+// map our the phar
+Phar::mapPhar('warhol.phar');
+
+// include warhol
+require("phar://warhol.phar/warhol.php");
+
+// if we're in cli, load it
+// otherwise we're just including the phar
+if ('cli' === php_sapi_name()) {
+
+    // init
+    warhol::init();
+
+    // run cli
+    warhol::cli();
+
+}
+
+// and done
+__HALT_COMPILER();
+
+
+END;
+return $str;
+}
+
+
+
+
+
+/*
+ * This file is part of the Silex framework.
+ *
+ * (c) Fabien Potencier <fabien@symfony.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+ function stripWhitespace($source){
+        if (!function_exists('token_get_all')) {
+            return $source;
+        }
+
+        $output = '';
+        foreach (token_get_all($source) as $token) {
+            if (is_string($token)) {
+                $output .= $token;
+            } elseif (in_array($token[0], array(T_COMMENT, T_DOC_COMMENT))) {
+                $output .= str_repeat("\n", substr_count($token[1], "\n"));
+            } elseif (T_WHITESPACE === $token[0]) {
+                // reduce wide spaces
+                $whitespace = preg_replace('{[ \t]+}', ' ', $token[1]);
+                // normalize newlines to \n
+                $whitespace = preg_replace('{(?:\r\n|\r|\n)}', "\n", $whitespace);
+                // trim leading spaces
+                $whitespace = preg_replace('{\n +}', "\n", $whitespace);
+                $output .= $whitespace;
+            } else {
+                $output .= $token[1];
+            }
+        }
+
+        return $output;
+    }
