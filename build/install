@@ -18,13 +18,14 @@ if ((include "Archive/Tar.php") === false) {
 
 
 // pull down the latest version
-$latest = "https://warholcdn.com/get/latest";
+$latest = "https://github.com/traviskuhl/warhol/raw/master/build/warhol-latest.tar.gz";
 
 // get it
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $latest);
 curl_setopt($ch, CURLOPT_HEADER, 0);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
 $resp = curl_exec($ch);
 curl_close($ch);
 
@@ -33,4 +34,46 @@ if (!$resp) {
 	exit("Unable to retrieve the source tar at '$latest'.\n");
 }
 
-// untar it 
+// write tar to tmp
+$tmp = tempnam(sys_get_temp_dir(), 'warhol');
+file_put_contents($tmp, $resp);
+
+// open it
+$tar = new Archive_Tar($tmp, 'gz');
+
+// get the phar
+$phar = $tar->extractInString('warhol.phar');
+
+// no lib dir
+if (!file_exists("/usr/local/lib/warhol")) {
+	mkdir("/usr/local/lib/warhol", 0755);
+}
+
+// share
+$share = "/usr/local/lib/warhol/warhol.phar";
+
+	// share already exists
+	if (file_exists($share)) {		
+		unlink($share);
+		unlink("/usr/share/pear/warhol.php");
+		unlink("/usr/local/bin/warhol");
+	}
+
+// now place it. swallow the error 
+// and then check
+@file_put_contents($share, $phar);
+
+// 775 it
+chmod($share, 0755);
+
+	// nope
+	if (!file_exists($share)) {
+		exit("Looks like you don't have permission to write to '$share'.\n");
+	}
+
+// symlink to bin and share
+symlink($share, "/usr/share/pear/warhol.php");
+symlink($share, "/usr/local/bin/warhol");
+
+// tell them we're done
+exit("Warhol has been installed. Enjoy!\n");

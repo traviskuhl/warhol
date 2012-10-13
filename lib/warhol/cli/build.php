@@ -112,15 +112,17 @@ class build extends cmd {
 				}
 			}
 
-			// dir
-			$tdir = "{$tmp}{$file['dir']}";
-			$tfile = ".{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}";
+			// // dir
+			// $tdir = "{$tmp}{$file['dir']}";
+			// $tfile = "{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}";
 
-			// write to the tmp dir
-			system("mkdir -p $tdir");
+			// // write to the tmp dir
+			// system("mkdir -p $tdir");
 
-			// write
-			file_put_contents($tfile, $content);
+			// // write
+			// file_put_contents($tfile, $content);
+
+			$tar->addString("{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}", $content);
 
 			// add it tar
 			$update[] = $tfile;
@@ -128,7 +130,7 @@ class build extends cmd {
 		}
 
 		// create the tar
-		$tar->create($update);
+		// $tar->create($update);
 
 		// move back
 		chdir($cwd);
