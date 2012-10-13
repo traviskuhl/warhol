@@ -1,0 +1,36 @@
+<?php
+
+// no version global means this version 
+// of php is super old
+if (!defined('PHP_VERSION')) {
+	exit("You version of PHP is super old. Like really, really, really, really old.\n");
+}
+
+// make sure our version is good
+if (version_compare(PHP_VERSION, 5.3) === -1) {
+	exit("Your version of PHP (".PHP_VERSION.") is not compatable with warhol.php\n");
+}
+
+// try to include Archive/Tar.php
+if ((include "Archive/Tar.php") === false) {
+	exit("You don't seem to have Archive_Tar available in your include_dir. Try installing with `pear install Archive_Tar`\n");
+}
+
+
+// pull down the latest version
+$latest = "https://warholcdn.com/get/latest";
+
+// get it
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $latest);
+curl_setopt($ch, CURLOPT_HEADER, 0);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+$resp = curl_exec($ch);
+curl_close($ch);
+
+// nope
+if (!$resp) {
+	exit("Unable to retrieve the source tar at '$latest'.\n");
+}
+
+// untar it 

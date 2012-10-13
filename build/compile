@@ -78,7 +78,7 @@ function stub($sha, $date, $ts) {
 $str = '#!/usr/bin/env php
 <?php
 ///////////////////////////////////////////////////////////////////////
-/// (c) travis kuhl 2012 - author: travis kuhl (travis@kuhl.co)
+/// (c) the.kuhl.co 2012 - author: travis kuhl (travis@kuhl.co)
 /// 
 /// Licensed under the Apache License, Version 2.0 (the "License"); 
 /// you may not use this work except in  compliance with the License. 
@@ -101,6 +101,9 @@ $str = '#!/usr/bin/env php
 $str .= <<<'END'
 // map our the phar
 Phar::mapPhar('warhol.phar');
+
+// phar
+define('WARHOL_LIB_ROOT', 'phar://warhol.phar/');
 
 // include warhol
 require("phar://warhol.phar/warhol.php");

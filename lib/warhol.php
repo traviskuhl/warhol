@@ -10,7 +10,9 @@ namespace {
 	spl_autoload_register(array('warhol', 'autoloader'));
 
 	// we assume we're in the root
-	define("W_LIB_ROOT", realpath(__DIR__));
+	if (!defined('WARHOL_LIB_ROOT')) {
+		define("WARHOL_LIB_ROOT", realpath(__DIR__));
+	}
 
 
 	////////////////////////////////////////////
@@ -39,7 +41,7 @@ namespace {
 
 			// if part1 is tuaurs
 			if ($parts[0] == 'warhol') { 
-				$file = W_LIB_ROOT . "/" . implode("/", $parts) . ".php";
+				$file = WARHOL_LIB_ROOT . "/" . implode("/", $parts) . ".php";
 			}
 
 			// if file include it
@@ -152,7 +154,7 @@ namespace warhol {
 
 			// load any files we definiley need
 			$this->load(array(
-					W_LIB_ROOT.'/warhol/formator/*.php'
+					WARHOL_LIB_ROOT.'/warhol/formator/*.php'
 				));
 
 		}
