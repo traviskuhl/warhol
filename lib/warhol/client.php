@@ -6,21 +6,21 @@ use \warhol;
 class client extends plugin {
 
 	// loaded
-	private $_loaded = false;	
+	private $_loaded = false;
 	private $_manifest = array();
 
 	// init
-	public function init($cfg=array()) {		
+	public function init($cfg=array()) {
 
 		// manifest
-		$file = realpath($cfg['manifest']);	
+		$file = realpath($cfg['manifest']);
 
 		// lets load our root
 		if (!file_exists($file)) {
 			return false;
 		}
-		
-		// root 
+
+		// root
 		$root = (isset($cfg['root']) ? $cfg['root'] : dirname($file));
 
 		// root
@@ -29,8 +29,8 @@ class client extends plugin {
 		// manifest
 		$this->_manifest = new db($file);
 
-		// yes it's loaded		
-		$this->_loaded = true;		
+		// yes it's loaded
+		$this->_loaded = true;
 
 	}
 
@@ -47,9 +47,14 @@ class client extends plugin {
 		return md5($path);
 	}
 
-	public function getFile($path) {
-		$fid = $this->fid($path);
+	public function file($by, $path) {
+		$fid = ($by == 'fid' ? $path : $this->fid($path));
 		return new client\file($this, $fid);
+	}
+
+	// rollup
+	public function rollup($name) {
+		return new client\rollup($this, $name);
 	}
 
 }

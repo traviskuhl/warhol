@@ -4,9 +4,9 @@ namespace warhol\client;
 use \warhol;
 
 class file extends asset {
-	
+
 	public function init($id) {
-		$this->_id = $id;		
+		$this->_id = $id;
 
 		// loaded
 		$this->_loaded = $this->manifest()->get('files')->exists($this->_id);
@@ -21,7 +21,10 @@ class file extends asset {
 
 	// content
 	public function getContent() {
+
 		$content = file_get_contents($this->root.$this->file['rel']);
+
+		return $content;
 	}
 
 	// mime

@@ -4,14 +4,14 @@ namespace warhol;
 use \warhol;
 
 class server extends plugin {
-	
+
 	// cfg
 	protected $cfg = array();
 
 	public function init($cfg) {
 		$this->cfg = $cfg;
 
-		// root 
+		// root
 		$root = realpath(isset($cfg['root']) ? $cfg['root'] : ".");
 
 		// lets get our manifest
@@ -31,7 +31,7 @@ class server extends plugin {
 		// figure out if there's something
 		// specical we need to do
 		if ($path[0] == 'rollup') {
-
+			$this->rollup($path[1]);
 		}
 		else if ($path[0] == 'combo') {
 
@@ -47,7 +47,7 @@ class server extends plugin {
 	public function file($path) {
 
 		// fid
-		$file = $this->client->getFile($path);
+		$file = $this->client->file('path', $path);
 
 		// see if it's in our manifest
 		if (!$file->loaded()) {
@@ -56,6 +56,19 @@ class server extends plugin {
 
 		// print
 		$this->_print($file);
+
+	}
+
+	// rollup
+	public function rollup($name) {
+		// get stuff
+		list($name, $ext) = explode('.', $name);
+
+		// get it 
+		$rollup = $this->client->rollup($name);
+
+		// rollup
+		$this->_print($rollup);
 
 	}
 
@@ -69,6 +82,6 @@ class server extends plugin {
 		// contnet
 		exit($asset->getContent());
 
-	} 
+	}
 
 }

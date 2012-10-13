@@ -8,7 +8,7 @@ class db {
 	private $_file = false;
 
 	private $change = false;
-	
+
 	public function __construct($file) {
 
 		$this->_file = $file;
@@ -34,11 +34,11 @@ class db {
 		return $this->set($name, $value);
 	}
 
-	public function get($ns='default', $name=false) {	
+	public function get($ns='default', $name=false) {
 		$ns = new \taurus\db\item($ns, $this);
 		return ($name ? $ns->get($name) : $ns);
 	}
- 
+
 	public function set($name, $value=false, $ns='default') {
 		if (is_array($name)) {
 			foreach ($name as $k => $v) {
@@ -57,13 +57,13 @@ class db {
 		if (!array_key_exists($ns, $this->_data)) { $this->_data[$ns] = array(); }
 		$this->_data[$ns][$key] = $val;
 		$this->change = true;
-		return $this;		
+		return $this;
 	}
 
 	public function getByNamespace($ns) {
 		if (!array_key_exists($ns, $this->_data)) { $this->_data[$ns] = array(); }
-		return $this->_data[$ns];			
-	}	
+		return $this->_data[$ns];
+	}
 
 
 }
@@ -77,6 +77,11 @@ class item {
 	public function __construct($root, $parent) {
 		$this->root = $root;
 		$this->parent = $parent;
+	}
+
+	// all
+	public function all() {
+		return $this->parent->getByNamespace($this->root);
 	}
 
 	public function __set($name, $value) {
@@ -95,7 +100,7 @@ class item {
 	public function set($name, $value=false) {
 		if (!is_array($name) AND $value != false) {
 			$name = array($name=>$value);
-		}	
+		}
 		foreach ($name as $key => $value) {
 			$this->parent->setByNamespace($this->root, $key, $value);
 		}
