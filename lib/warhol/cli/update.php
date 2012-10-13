@@ -19,10 +19,19 @@ class update extends cmd {
 	public function run($root=false) {
 
 		// get our root
-		$config = $this->getConfig($root);
+		$this->getConfig($root);
 
-		var_dump($config); die;
+		// read the files
+		foreach ($this->manifest->get('files')->all()  as $file) {
+			$path = $this->config->root.$file['rel'];
+			if (is_file($path)) {
+				$f = $this->finfo($path);
+				$this->manifest->set($f['id'], $f, 'files');
+			}	
+		}
 
+		// done
+		return $this->end("Project folder updated.");
 
 	}
 

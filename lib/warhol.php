@@ -131,8 +131,8 @@ namespace warhol {
 			else if (isset($_SERVER['USER'])) {				
 				$this->user = array(
 					'name' => $_SERVER['USER'],
-					'uid' => posix_getuid(),
-					'gid' => posix_getgid()
+					'uid' => getmyuid(),
+					'gid' => getmygid()
 				);
 			}
 			
@@ -190,31 +190,57 @@ namespace warhol {
 		////////////////////////////////////////////
 		/// @brief register a new formator
 		///
+		/// @param $name name of formator
 		/// @param $class formator class
 		/// @param $ext array of file exstensions to handle
 		/// @return warhol instance
 		////////////////////////////////////////////	    
-	    public function formator($class, $exts) {
+	    public function formator($name, $class, $exts) {
 	    	foreach ($exts as $ext) {
-	    		$this->formators[$ext] = array(
+	    		$this->formators[$name] = array(	    			
 	    			'class' => $class,
-	    			'instance' => false
+	    			'instance' => false,
+	    			'ext' => $exts
 	    		);
 	    	}	    		 
 	    	return $this;
 	    }
 	    public function getFromatorExt() {
-	    	return array_keys($this->formators);
+	    	$ext = array();
+	    	foreach ($this->formators as $f) {
+	    		$ext = array_merge($ext, $f['ext']);
+	    	}
+	    	return $ext;
 	    }
-	    public function getFormator($ext) {
-	    	// no formator return the false
-	    	if (!array_key_exists($ext, $this->formators)) {
-	    		return new formator();
+	    public function getFormators($by, $what) {
+	    	$formators = array();
+	    	if ($by == 'name') {
+	    		ksort($what);
+	    		foreach ($what as $name => $x) {
+	    			$formators[] = $name;
+	    		}
 	    	}
-	    	if (!$this->formators[$ext]['instance']) {
-	    		$this->formators[$ext]['instance'] = new $this->formators[$ext]['class'];
+	    	else {
+	    		foreach ($this->formators as $name => $f) {
+	    			if (in_array($what, $f['ext'])) {
+	    				$formators[] = $name;
+	    			}
+	    		}
 	    	}
-	    	return $this->formators[$ext]['instance'];
+
+	    	// loop 
+	    	foreach ($formators as $i => $name) {
+		    	// no formator return the false
+		    	if (!array_key_exists($name, $this->formators)) {
+		    		unset($formators[$i]);
+		    		continue;
+	    		}
+		    	if (!$this->formators[$name]['instance']) {
+		    		$this->formators[$name]['instance'] = new $this->formators[$name]['class'];
+		    	}
+		    	$formators[$i] = $this->formators[$name]['instance'];
+		    }
+		    return $formators;
 	    }
 
 		////////////////////////////////////////////

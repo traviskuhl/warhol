@@ -51,7 +51,9 @@ class add extends cmd {
 
 			// add our files
 			foreach (iterator_to_array($regex) as $file) {
-				$files[] = $file[0];
+				if (is_file($file[0])) {
+					$files[] = $file[0];
+				}
 			}
 
 		}
@@ -61,7 +63,7 @@ class add extends cmd {
 		foreach ($files as $file) {		
 
 			// f
-			$f = $this->finfo($file);
+			$f = $this->finfo($file);			
 
 			// ok lets add these files to the manifest
 			$this->manifest->set($f['id'], $f, 'files');

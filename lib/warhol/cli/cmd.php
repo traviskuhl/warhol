@@ -85,19 +85,58 @@ class cmd {
 		// content
 		$content = file_get_contents($file);
 
+		// get our settings and stuff
+		list($settings, $rollups) = $this->getSettings($ext, $content);
+
+		// name
+		$name = str_replace(".{$ext}", '', basename($file));
+
 		// return it's info
 		return array(
 			'id' => md5($rel),
 			'rel' => $rel,
 			'ext' => $ext,
-			'rollups' => warhol::getFormator($ext)->getRollups($content),
-			'settings' => warhol::getFormator($ext)->getSettings($content),
+			'rollups' => $rollups,
+			'settings' => $settings,
 			'mtime' => filemtime($file),
-			'md5' => md5($content)
+			'md5' => md5($content),
+			'bid' => false,
+			'name' => $name,
+			'dir' => str_replace("{$name}.{$ext}", '', $rel)
 		);
 
 	}
 
+	public function getSettings($ext, $content) {
+		if (stripos($content, '@warhol:') === false) {
+			return array(array(), array());
+		}
+		
+		// hold for more
+		$settings = $rollups = array();
+
+		// check for each setting
+		if (preg_match_all('#warhol:([^\s]+) ([^\s]+)#i', $content, $matches, PREG_SET_ORDER)) {
+			foreach ($matches as $match) {
+				$sname = $match[1];				
+				foreach (explode(',', trim($match[2])) as $item) {
+					if (stripos($item, ':')===false) { $item .= ':'; }
+					list($name, $val) = explode(':', $item);
+					$settings[$sname][$name] = $val;
+				}
+			}
+		}
+
+		// rollup
+		if (isset($settings['rollup'])) {
+			$rollups = $settings['rollup'];
+			unset($settings['rollup']);
+		}
+
+		// give them back
+		return array($settings, $rollups);
+
+	}
 
 	public function getConfig($root=false){ 
 
