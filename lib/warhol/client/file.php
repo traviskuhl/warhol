@@ -19,6 +19,10 @@ class file extends asset {
 
 	}
 
+	public function http() {
+		return "/assets".$this->file['rel'];
+	}
+
 	// content
 	public function getContent() {
 

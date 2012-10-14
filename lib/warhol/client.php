@@ -57,4 +57,37 @@ class client extends plugin {
 		return new client\rollup($this, $name);
 	}
 
+	// val
+	public function val($key, $ary, $default=false) {
+		return (array_key_exists($key, $ary) ? $ary[$key] : $default);
+	}
+
+	// tag
+	public function tag($type, $what, $cfg=array()) {
+		// see if it's a file
+		if (is_string($what)) {
+			$file = $this->file('path', $what);
+			$url = $file->http();
+		}
+
+		$lines = array();
+		switch($type) {
+
+			// style tag
+			case 'style':
+				$lines[] = '<link rel="'.$this->val('rel', $cfg, 'stylesheet').'" type="'.$this->val('type', $cfg, 'text/css').'" href="'.$url.'">';
+
+				break;
+
+			// image tag
+			case 'image':
+
+
+			// script tag
+			case 'script':
+
+		};
+		return implode("\n", $lines);
+	}
+
 }

@@ -36,11 +36,11 @@ namespace {
 			// get the parts
 			$parts = explode('\\', $name);
 
-			// file 
+			// file
 			$file = false;
 
 			// if part1 is tuaurs
-			if ($parts[0] == 'warhol') { 
+			if ($parts[0] == 'warhol') {
 				$file = WARHOL_LIB_ROOT . "/" . implode("/", $parts) . ".php";
 			}
 
@@ -73,7 +73,7 @@ namespace {
 		////////////////////////////////////////////
 		public static function __callStatic($name, $args) {
 			$i = self::singleton();
-			return call_user_func_array(array($i, $name), $args);	
+			return call_user_func_array(array($i, $name), $args);
 		}
 
 		////////////////////////////////////////////
@@ -98,7 +98,7 @@ namespace {
 ////////////////////////////////////////////
 namespace warhol {
 
-	// localize an exception 
+	// localize an exception
 	class Exception extends \Exception {}
 
 
@@ -106,38 +106,39 @@ namespace warhol {
 	/// @class base
 	/// @namespace warhol
 	///
-	/// @brief main warhol class 
+	/// @brief main warhol class
 	////////////////////////////////////////////
 	class base {
 
 		// our version
 		const VERSION = "dev";
 
-		private $manifest = false;
+		private $manifest = false;		
+		private $client = false;
 		private $user = array();
 
 		// formators
-		protected $formators = array();		
+		protected $formators = array();
 
 		public function __construct() {
 
 			// see if this user is running as sudo
 			// if yes, we really want their user
-			if (isset($_SERVER['SUDO_USER'])) {				
+			if (isset($_SERVER['SUDO_USER'])) {
 				$this->user = array(
 					'name' => $_SERVER['SUDO_USER'],
 					'uid' => $_SERVER['SUDO_UID'],
 					'gid' => $_SERVER['SUDO_GID']
 				);
 			}
-			else if (isset($_SERVER['USER'])) {				
+			else if (isset($_SERVER['USER'])) {
 				$this->user = array(
 					'name' => $_SERVER['USER'],
 					'uid' => getmyuid(),
 					'gid' => getmygid()
 				);
 			}
-			
+
 		}
 
 		public function __call($name, $args) {
@@ -172,13 +173,13 @@ namespace warhol {
 	                $files = array($pattern);
 	            }
 	            else {
-	                $files = glob($pattern);            
+	                $files = glob($pattern);
 	            }
 
 	            // loop through each file
-	            foreach ($files as $file) {           
+	            foreach ($files as $file) {
 
-	                // load it 
+	                // load it
 	                include_once($file);
 
 	                // loaded
@@ -196,15 +197,15 @@ namespace warhol {
 		/// @param $class formator class
 		/// @param $ext array of file exstensions to handle
 		/// @return warhol instance
-		////////////////////////////////////////////	    
+		////////////////////////////////////////////
 	    public function formator($name, $class, $exts) {
 	    	foreach ($exts as $ext) {
-	    		$this->formators[$name] = array(	    			
+	    		$this->formators[$name] = array(
 	    			'class' => $class,
 	    			'instance' => false,
 	    			'ext' => $exts
 	    		);
-	    	}	    		 
+	    	}
 	    	return $this;
 	    }
 	    public function getFromatorExt() {
@@ -230,7 +231,7 @@ namespace warhol {
 	    		}
 	    	}
 
-	    	// loop 
+	    	// loop
 	    	foreach ($formators as $i => $name) {
 		    	// no formator return the false
 		    	if (!array_key_exists($name, $this->formators)) {
@@ -246,7 +247,7 @@ namespace warhol {
 	    }
 
 		////////////////////////////////////////////
-		/// @brief create a cli instance and 
+		/// @brief create a cli instance and
 		///			run the argument processor
 		///
 		/// @return void
@@ -257,13 +258,13 @@ namespace warhol {
 		}
 
 		////////////////////////////////////////////
-		/// @brief create a server instance 
+		/// @brief create a server instance
 		///
 		/// @return server instance
 		////////////////////////////////////////////
 		public function server($cfg) {
 			// no need to call anything else, server always serves
-			return new server($this, $cfg);			
+			return new server($this, $cfg);
 		}
 
 		////////////////////////////////////////////
@@ -271,9 +272,13 @@ namespace warhol {
 		///
 		/// @return client instnace
 		////////////////////////////////////////////
-		public function client($cfg) {
+		public function client($cfg=false) {
+			// do we already have a client
+			if ($this->client && !$cfg) {
+				return $this->client;
+			}
 			// no need to call anything else, server always serves
-			$this->client = new client($this, $cfg);						
+			$this->client = new client($this, $cfg);
 			return $this;
 		}
 
@@ -281,7 +286,7 @@ namespace warhol {
 		public function getUser() {
 			return $this->user;
 		}
-		
+
 	}
 
 
