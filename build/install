@@ -1,6 +1,6 @@
 <?php
 
-// no version global means this version 
+// no version global means this version
 // of php is super old
 if (!defined('PHP_VERSION')) {
 	exit("You version of PHP is super old. Like really, really, really, really old.\n");
@@ -49,31 +49,31 @@ if (!file_exists("/usr/local/lib/warhol")) {
 	mkdir("/usr/local/lib/warhol", 0755);
 }
 
-// share
-$share = "/usr/local/lib/warhol/warhol.phar";
+// where the lib is going to go
+$lib = "/usr/local/lib/warhol/warhol.phar";
 
 	// share already exists
-	if (file_exists($share)) {		
-		unlink($share);
+	if (file_exists($lib)) {
+		unlink($lib);
 		unlink("/usr/share/pear/warhol.php");
 		unlink("/usr/local/bin/warhol");
 	}
 
-// now place it. swallow the error 
+// now place it. swallow the error
 // and then check
-@file_put_contents($share, $phar);
-
-// 775 it
-chmod($share, 0755);
+@file_put_contents($lib, $phar);
 
 	// nope
-	if (!file_exists($share)) {
-		exit("Looks like you don't have permission to write to '$share'.\n");
+	if (!file_exists($lib)) {
+		exit("Looks like you don't have permission to write to '$lib'.\n");
 	}
 
+// 775 the lib
+chmod($lib, 0755);
+
 // symlink to bin and share
-symlink($share, "/usr/share/pear/warhol.php");
-symlink($share, "/usr/local/bin/warhol");
+symlink($lib, "/usr/share/pear/warhol.php");
+symlink($lib, "/usr/local/bin/warhol");
 
 // tell them we're done
 exit("Warhol has been installed. Enjoy!\n");
