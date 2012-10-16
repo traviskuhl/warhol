@@ -58,17 +58,19 @@ unset($phar);
 // chmod 
 chmod("warhol.phar", 0755);
 
+
 // create a 
-$tar = new Archive_Tar("../builds/warhol-$version.tar.gz", 'gz');
+$tar = new Archive_Tar("./warhol-$version.tar.gz", 'gz');
 
 // create
 $tar->create(array("./warhol.phar","../LICENSE","../README"));
 
 // copy to latest
-copy("../builds/warhol-$version.tar.gz", "../builds/warhol-latest.tar.gz");
+copy("./warhol-$version.tar.gz", "./warhol-latest.tar.gz");
 
 // remove
 unlink("warhol.phar");
+
 
 // goodbye sucka
 exit("DONE!\n\n");
