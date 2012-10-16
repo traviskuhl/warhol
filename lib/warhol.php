@@ -126,6 +126,7 @@ namespace warhol {
 			// if yes, we really want their user
 			if (isset($_SERVER['SUDO_USER'])) {
 				$this->user = array(
+					'home' => "/home/".$_SERVER['SUDO_USER'],
 					'name' => $_SERVER['SUDO_USER'],
 					'uid' => $_SERVER['SUDO_UID'],
 					'gid' => $_SERVER['SUDO_GID']
@@ -133,6 +134,7 @@ namespace warhol {
 			}
 			else if (isset($_SERVER['USER'])) {
 				$this->user = array(
+					'home' => $_SERVER['HOME'],
 					'name' => $_SERVER['USER'],
 					'uid' => getmyuid(),
 					'gid' => getmygid()
@@ -283,9 +285,47 @@ namespace warhol {
 		}
 
 
-		public function getUser() {
-			return $this->user;
+		public function getUser($key=false) {
+			return ($key ? $this->user[$key] : $this->user);
 		}
+
+		public function curl($url, $params=array(), $method="GET") {
+	        // create a new cURL resource
+	        $ch = curl_init();
+	    
+	        // url is rel
+	       	if ($method == 'GET') {
+	            $url .= '?'.http_build_query($params);
+	        }
+	        
+	        // set URL and other appropriate options
+	        curl_setopt($ch, CURLOPT_URL, $url);
+	        curl_setopt($ch, CURLOPT_HEADER, false);
+	        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);  
+	        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);          
+	        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+
+	        if ($method == 'POST') {
+	            curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+	        }
+                                         
+	        // grab URL and pass it to the browser
+	        $resp = curl_exec($ch);
+	        
+	        $i = curl_getinfo($ch);
+	        
+	        // close cURL resource, and free up system resources
+	        curl_close($ch);  
+
+	        if ($i['content_type'] == 'text/javascript') {
+	        	$resp = json_decode($resp, true);
+	        }
+	        
+	        return array($resp, $i);
+
+
+		}
+
 
 	}
 

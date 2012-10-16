@@ -8,9 +8,11 @@ class client extends plugin {
 	// loaded
 	private $_loaded = false;
 	private $_manifest = array();
+	public $cfg = array();
 
 	// init
 	public function init($cfg=array()) {
+		$this->cfg = $cfg;
 
 		// manifest
 		$file = realpath($cfg['manifest']);
@@ -48,6 +50,10 @@ class client extends plugin {
 	}
 
 	public function file($by, $path) {
+		// path has a user
+		if (substr($path,0,2) === 'u:') {
+			return new client\external($this, substr($path,2));
+		}	
 		$fid = ($by == 'fid' ? $path : $this->fid($path));
 		return new client\file($this, $fid);
 	}
@@ -64,29 +70,35 @@ class client extends plugin {
 
 	// tag
 	public function tag($type, $what, $cfg=array()) {
-		// see if it's a file
-		if (is_string($what)) {
-			$file = $this->file('path', $what);
-			$url = $file->http();
-		}
-
 		$lines = array();
-		switch($type) {
 
-			// style tag
-			case 'style':
-				$lines[] = '<link rel="'.$this->val('rel', $cfg, 'stylesheet').'" type="'.$this->val('type', $cfg, 'text/css').'" href="'.$url.'">';
+		// see if it's a file
+		if (is_array($what)) {
+			foreach ($what as $item) {
+				$lines[] = $this->tag($type, $item, $cfg);
+			}
+		}
+		else {
+			$file = $this->file('path', $what);
+			$url = $file->http();	
 
-				break;
+			switch($type) {
 
-			// image tag
-			case 'image':
+				// style tag
+				case 'style':
+					$lines[] = '<link rel="'.$this->val('rel', $cfg, 'stylesheet').'" type="'.$this->val('type', $cfg, 'text/css').'" href="'.$url.'">';
+
+					break;
+
+				// image tag
+				case 'image':
 
 
-			// script tag
-			case 'script':
+				// script tag
+				case 'script':
 
-		};
+			};
+		}
 		return implode("\n", $lines);
 	}
 

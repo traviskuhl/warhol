@@ -20,7 +20,7 @@ class file extends asset {
 	}
 
 	public function http() {
-		return "/assets".$this->file['rel'];
+		return rtrim($this->cfg['url']['local'],'/').$this->file['rel'];
 	}
 
 	// content

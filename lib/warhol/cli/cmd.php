@@ -163,8 +163,8 @@ class cmd {
 
 	}
 
-	public function getCommand($idx) {
-		return (array_key_exists($idx, $this->commands) ? $this->commands[$idx] : false);
+	public function getCommand($idx, $default=false) {
+		return (array_key_exists($idx, $this->commands) ? $this->commands[$idx] : $default);
 	}
 
 	/// 
@@ -175,6 +175,20 @@ class cmd {
 	public function setOptions($opts) {
 		$this->options = $opts;
 		return $this;
+	}
+
+	public function ask($text, $default=false, $tf=true) {
+		echo "$text ".($default ? "[$default]" : "").": ";
+		$a = trim(fgets(STDIN));		
+		if (empty($a) OR $a == "") { $a = $default;}
+		if ($tf) {
+	 		switch(strtolower($a{0})) {
+				case 'y': return true;
+				case 'n': return false;
+				default: return null;
+			}
+		}
+		return $a;
 	}
 
 }
