@@ -66,6 +66,7 @@ class client extends plugin {
 		// external prefix
 		$ep = (isset($this->cfg['userPrefix']) ? $this->cfg['userPrefix'] : 'u:' );
 
+
 		// path has a user
 		if ($by == 'path' AND substr($path,0,strlen($ep)) === $ep) {
 			return new client\external($this, $path);
@@ -78,9 +79,8 @@ class client extends plugin {
 	// rollup
 	public function rollup($name) {
 		// make sure there's no .
-		$name = str_replace(array('.js','.css'), "", $name);
-
-		return new client\rollup($this, $name);
+		list($name,$ext) = explode('.', $name);		
+		return new client\rollup($this, $name, $ext);
 	}
 
 	// val
@@ -89,9 +89,10 @@ class client extends plugin {
 	}
 
 	// url
-	public function tokenize($str) {
+	public function tokenize($str, $tokes=array()) {		
 		$bid = $this->_manifest->get()->get('bid', time());
-		return str_replace(array('{bid}'), array($bid), $str);
+		$tokes['bid'] = $bid;
+		return str_replace(array_map(function($v){ return '{'.$v.'}'; }, array_keys($tokes)), array_values($tokes), $str);
 	}
 
 	// url
@@ -144,9 +145,52 @@ class client extends plugin {
 				}
 			}
 		}
+
+		// prod
 		else {
 
+			if (is_string($what)) {
+				$file = (is_string($what) ? $this->file('path', $what) : $what);
+				$url = $file->http();	
+			}
+			else {
+				$parts = array();
+				foreach ($what as $item) {
+					if (substr($item,0,6) === 'rollup') {
+						$r = $this->rollup(substr($item,7));
+						$parts[] = $r->getName();
+					}
+					else {
+						$file = $this->file('path', $item);
+						$parts[] = $file->getBuildPath();	
+					}
+				}
+				$url = $this->tokenize($this->cfg['url']['http'].$this->cfg['url']['combo'], array(
+					'files' => implode('&', $parts),
+					'type' => ($type == 'style' ? 'css' : 'js')
+				));
+			}
 
+			
+
+			// for prod everything is rolled up together
+			switch($type) {
+
+				// style tag
+				case 'style':
+					$lines[] = '<link rel="'.$this->val('rel', $cfg, 'stylesheet').'" type="'.$this->val('type', $cfg, 'text/css').'" href="'.$url.'">';
+
+					break;
+
+				// image tag
+				case 'image':
+
+					break;
+				// script tag
+				case 'script':
+					$lines[] = '<script type="text/javascript" src="'.$url.'"></script>';
+					break;
+			};			
 
 		}
 

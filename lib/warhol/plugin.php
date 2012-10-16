@@ -44,7 +44,7 @@ class plugin {
 		return false;
 	}
 
-	public function __get($name) {
+	public function __get($name) {		
 		return $this->base->{$name};
 	}
 

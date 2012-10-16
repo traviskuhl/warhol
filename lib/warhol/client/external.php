@@ -13,6 +13,16 @@ class external extends asset {
 		return $this->tokenize(rtrim($this->cfg['url']['http'],'/')."/".ltrim($this->path,'/'));
 	}
 
+	// build name
+	public function getBuildName() {
+		return $this->path;
+	}
+
+	// buildpath
+	public function getBuildPath() {
+		return $this->path;
+	}	
+
 	// content
 	public function getContent() {
 

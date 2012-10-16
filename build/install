@@ -16,17 +16,27 @@ if ((include "Archive/Tar.php") === false) {
 	exit("You don't seem to have Archive_Tar available in your include_dir. Try installing with `pear install Archive_Tar`\n");
 }
 
-// pull down the latest version
-$latest = "https://github.com/traviskuhl/warhol/raw/master/build/warhol-latest.tar.gz";
+// local
+if (isset($argv[1]) AND $argv[1] === 'local') {
+	$resp = file_get_contents("warhol-latest.tar.gz");
+}
 
-// get it
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, $latest);
-curl_setopt($ch, CURLOPT_HEADER, 0);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-$resp = curl_exec($ch);
-curl_close($ch);
+// get from remote
+else {
+
+	// pull down the latest version
+	$latest = "https://github.com/traviskuhl/warhol/raw/master/build/warhol-latest.tar.gz";
+
+	// get it
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $latest);
+	curl_setopt($ch, CURLOPT_HEADER, 0);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+	$resp = curl_exec($ch);
+	curl_close($ch);
+
+}
 
 // nope
 if (!$resp) {
@@ -58,9 +68,9 @@ $stub = stub($lib);
 
 // share already exists
 if (file_exists($lib)) {
-	unlink($lib);
-	unlink($bin);
-	unlink($share);	
+	@unlink($lib);
+	@unlink($bin);
+	@unlink($share);	
 }
 
 // now place it. swallow the error
@@ -75,10 +85,8 @@ if (file_exists($lib)) {
 // no place bin
 @file_put_contents($bin, $stub); chmod($bin, 0755);
 
-var_dump( $share, $lib ); die;
-
 // symlink to share
-symlink($share, $lib);
+symlink($lib, $share);
 
 // tell them we're done
 exit("Warhol has been installed. Enjoy!\n");

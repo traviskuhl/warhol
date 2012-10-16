@@ -77,8 +77,7 @@ exit("DONE!\n\n");
 
 
 function stub($sha, $date, $ts) {
-$str = '
-<?php
+$str = '<?php
 ///////////////////////////////////////////////////////////////////////
 /// (c) the.kuhl.co 2012 - author: travis kuhl (travis@kuhl.co)
 /// 

@@ -23,8 +23,13 @@ class file extends asset implements \ArrayAccess {
 
 	}
 
-	public function http() {
-		return rtrim($this->cfg['url']['local'],'/').$this->file['rel'];
+	public function http() {		
+		if ($this->base->cfg['env'] == 'prod') {
+			return $this->tokenize($this->base->cfg['url']['http'] . $this->getBuildPath());
+		}
+		else {
+			return rtrim($this->base->cfg['url']['local'],'/').$this->file['rel'];
+		}
 	}
 
 	// content
