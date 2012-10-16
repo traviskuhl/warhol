@@ -10,7 +10,7 @@ class external extends asset {
 	}
 
 	public function http() {
-		return rtrim($this->cfg['url']['http'],'/')."/".ltrim($this->path,'/');
+		return $this->tokenize(rtrim($this->cfg['url']['http'],'/')."/".ltrim($this->path,'/'));
 	}
 
 	// content

@@ -5,6 +5,8 @@ use \warhol;
 
 class rollup extends asset {
 
+    private $files = array();
+
     public function init($name) {
         // files
         $files = array();
@@ -22,8 +24,14 @@ class rollup extends asset {
         krsort($files);
 
         // files
-        $this->files = $files;
+        foreach ($files as $fid => $x) {        
+            $this->files[$fid] = $this->file('fid', $fid);
+        }
 
+    }
+
+    public function getFiles() {
+        return $this->files;
     }
 
     public function getContent() {

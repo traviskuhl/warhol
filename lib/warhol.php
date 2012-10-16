@@ -117,6 +117,8 @@ namespace warhol {
 		private $client = false;
 		private $user = array();
 
+		private $_init = false;
+
 		// formators
 		protected $formators = array();
 
@@ -155,10 +157,16 @@ namespace warhol {
 
 		public function init() {
 
+			// only init once
+			if ($this->_init) {return;}
+
 			// load any files we definiley need
 			$this->load(array(
 					WARHOL_LIB_ROOT.'/warhol/formator/*.php'
 				));
+
+			// init
+			$this->_init = true;
 
 		}
 
@@ -255,6 +263,7 @@ namespace warhol {
 		/// @return void
 		////////////////////////////////////////////
 		public function cli() {
+			$this->init();
 			$cli = new cli($this);
 			$cli->run();
 		}
@@ -265,6 +274,7 @@ namespace warhol {
 		/// @return server instance
 		////////////////////////////////////////////
 		public function server($cfg) {
+			$this->init();
 			// no need to call anything else, server always serves
 			return new server($this, $cfg);
 		}
@@ -275,6 +285,9 @@ namespace warhol {
 		/// @return client instnace
 		////////////////////////////////////////////
 		public function client($cfg=false) {
+			// always init
+			$this->init();
+
 			// do we already have a client
 			if ($this->client && !$cfg) {
 				return $this->client;

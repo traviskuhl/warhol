@@ -20,6 +20,10 @@ class db {
 
 	}
 
+	public function getFile(){
+		return $this->_file;
+	}
+
 	public function __destruct() {
 		if ($this->change) {
 			file_put_contents($this->_file, json_encode($this->_data));

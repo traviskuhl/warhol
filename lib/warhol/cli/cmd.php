@@ -108,7 +108,7 @@ class cmd {
 	}
 
 	public function getSettings($ext, $content) {
-		if (stripos($content, '@warhol:') === false) {
+		if (stripos($content, '@warhol ') === false) {
 			return array(array(), array());
 		}
 		
@@ -116,7 +116,7 @@ class cmd {
 		$settings = $rollups = array();
 
 		// check for each setting
-		if (preg_match_all('#warhol:([^\s]+) ([^\s]+)#i', $content, $matches, PREG_SET_ORDER)) {
+		if (preg_match_all('#warhol ([^\s]+)=([^\s]+)#i', $content, $matches, PREG_SET_ORDER)) {
 			foreach ($matches as $match) {
 				$sname = $match[1];				
 				foreach (explode(',', trim($match[2])) as $item) {

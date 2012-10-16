@@ -22,23 +22,29 @@ class cli extends plugin {
 		// default command is help
 		$cmds = array(); $opts = array();
 
+		$f = false;
+
 		// loop through our arguments and 
 		// find our first command
-		foreach ($args as $arg) {
-			if ($arg{0} != '-') {
+		foreach ($args as $i => $arg) {
+			if ($arg{0} != '-' AND $f === false) {
 				$cmds[] = $arg;
 			}
-			else {
+			else if (substr($arg,0,2) == '--') {
 				$opts[] = $arg;
+			}
+			else if ($f) {
+				$f = false;
+			}
+			else {				
+				$opts[$arg] = (isset($args[$i+1]) ? $args[$i+1] : true); 			
+				$f = true;
 			}
 		}
 
 		// our first cmd is 
 		// the module to execute
 		$cmd = array_shift($cmds);
-
-		// reset our global opt
-		$GLOBALS['argv'] = array_merge(array($script), $cmds, $opts);
 
 		// class name of command
 		$class = '\\warhol\\cli\\'.$cmd;
@@ -51,7 +57,7 @@ class cli extends plugin {
 		// we have that command
 		// create our class
 		$c = new $class($this);
-
+	
 		// set our commands
 		$c->setCommands($cmds)->setOptions($opts)->process();
 

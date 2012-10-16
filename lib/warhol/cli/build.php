@@ -11,9 +11,6 @@ use \Archive_Tar;
 
 class build extends cmd {
 
-	public static $opts = array(
-			""
-		);
 
 	public function run($match='.', $opts=array()) {
 		$root = false; 
@@ -48,7 +45,7 @@ class build extends cmd {
 			$f = $this->finfo($path);
 
 			// hasn't changed and has been built
-			if ($file['bid'] == $bid AND $f['mtime'] == $file['mtime'] AND $f['md5'] == $file['md5']) {
+			if ($file['bid'] != false AND $f['md5'] == $file['md5']) {
 				continue;
 			}
 
@@ -68,75 +65,90 @@ class build extends cmd {
 			return $this->end("Everything is up-to-date");
 		}
 
-		// tmp
-		$tmp = "/tmp/w".time(); mkdir($tmp);
-		$cwd = getcwd();
+		// no tar
+		if (!isset($opts['-no-tar'])) {
 
-		// tar
-		$tar = new Archive_Tar("{$cwd}/{$build}", 'gz');
+			// tmp
+			$tmp = "/tmp/w".time(); mkdir($tmp);
+			$cwd = getcwd();
 
-		// move in
-		chdir($tmp);
+			// tar
+			$tar = new Archive_Tar("{$cwd}/{$build}", 'gz');
 
-		// loop through each updated file
-		foreach ($update as $fid) {
-			$formators = array();
+			// move in
+			chdir($tmp);
 
-			// get hte file
-			$file = $this->manifest->get('files')->get($fid);
+			// loop through each updated file
+			foreach ($update as $fid) {
+				$formators = array();
 
-			// file path
-			$path = $this->config->root.$file['rel'];
+				// get hte file
+				$file = $this->manifest->get('files')->get($fid);
 
-			// new file, lets loop through our formators 
-			// and figure out what we need to run
-			// if they don't give a list in settings
-			// we run them based on ext
-			if (isset($file['settings']['format'])) {
-				$formators = warhol::getFormators('name', $file['settings']['format']);
-			}
-			else {
-				$formators = warhol::getFormators('ext', $file['ext']);
-			}
+				// file path
+				$path = $this->config->root.$file['rel'];
 
-			// content
-			$content = file_get_contents($path);
-
-			// loop through each format
-			foreach ($formators as $o) {
-				$o->setManifest($this->manifest);
-				$o->setConfig($this->config);
-				$resp = $o->format($content, $file);
-				if ($resp) {
-					$content = $resp;
+				// new file, lets loop through our formators 
+				// and figure out what we need to run
+				// if they don't give a list in settings
+				// we run them based on ext
+				if (isset($file['settings']['format'])) {
+					$formators = warhol::getFormators('name', $file['settings']['format']);
 				}
+				else {
+					$formators = warhol::getFormators('ext', $file['ext']);
+				}
+
+				// content
+				$content = file_get_contents($path);
+
+				// loop through each format
+				foreach ($formators as $o) {
+					$o->setManifest($this->manifest);
+					$o->setConfig($this->config);
+					$resp = $o->format($content, $file);
+					if ($resp) {
+						$content = $resp;
+					}
+				}
+
+				// // dir
+				// $tdir = "{$tmp}{$file['dir']}";
+				// $tfile = "{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}";
+
+				// // write to the tmp dir
+				// system("mkdir -p $tdir");
+
+				// // write
+				// file_put_contents($tfile, $content);
+
+				$tar->addString("{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}", $content);
+
 			}
 
-			// // dir
-			// $tdir = "{$tmp}{$file['dir']}";
-			// $tfile = "{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}";
+			// create the tar
+			// $tar->create($update);
 
-			// // write to the tmp dir
-			// system("mkdir -p $tdir");
+			// move back
+			chdir($cwd);
 
-			// // write
-			// file_put_contents($tfile, $content);
+			// remove tmp
+			`rm -r $tmp`;
 
-			$tar->addString("{$file['dir']}.{$file['dir']}{$file['name']}-{$file['bid']}.{$file['ext']}", $content);
 
-			// add it tar
-			$update[] = $tfile;
+		} // end no tar
 
+
+		// what was updated		
+		$this->manifest->set('files', $update, 'updated');
+
+		// set bid
+		$this->manifest->set('bid', $bid);		
+
+		// also write the manifest somewhere
+		if (isset($opts['-m'])) {
+			copy($this->manifest->getFile(),  $opts['-m']);
 		}
-
-		// create the tar
-		// $tar->create($update);
-
-		// move back
-		chdir($cwd);
-
-		// remove tmp
-		`rm -r $tmp`;
 
 		// tar
 		return $this->end("Build created");
