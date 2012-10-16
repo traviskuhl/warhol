@@ -77,7 +77,7 @@ exit("DONE!\n\n");
 
 
 function stub($sha, $date, $ts) {
-$str = '#!/usr/bin/env php
+$str = '
 <?php
 ///////////////////////////////////////////////////////////////////////
 /// (c) the.kuhl.co 2012 - author: travis kuhl (travis@kuhl.co)
@@ -109,18 +109,6 @@ define('WARHOL_LIB_ROOT', 'phar://warhol.phar/');
 
 // include warhol
 require("phar://warhol.phar/warhol.php");
-
-// if we're in cli, load it
-// otherwise we're just including the phar
-if ('cli' === php_sapi_name()) {
-
-    // init
-    warhol::init();
-
-    // run cli
-    warhol::cli();
-
-}
 
 // and done
 __HALT_COMPILER();

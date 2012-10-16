@@ -16,7 +16,6 @@ if ((include "Archive/Tar.php") === false) {
 	exit("You don't seem to have Archive_Tar available in your include_dir. Try installing with `pear install Archive_Tar`\n");
 }
 
-
 // pull down the latest version
 $latest = "https://github.com/traviskuhl/warhol/raw/master/build/warhol-latest.tar.gz";
 
@@ -51,13 +50,18 @@ if (!file_exists("/usr/local/lib/warhol")) {
 
 // where the lib is going to go
 $lib = "/usr/local/lib/warhol/warhol.phar";
+$bin = "/usr/local/bin/warhol";
+$share = "/usr/share/pear/warhol.php";
 
-	// share already exists
-	if (file_exists($lib)) {
-		unlink($lib);
-		unlink("/usr/share/pear/warhol.php");
-		unlink("/usr/local/bin/warhol");
-	}
+// make our stub
+$stub = stub($lib);
+
+// share already exists
+if (file_exists($lib)) {
+	unlink($lib);
+	unlink($bin);
+	unlink($share);	
+}
 
 // now place it. swallow the error
 // and then check
@@ -65,15 +69,64 @@ $lib = "/usr/local/lib/warhol/warhol.phar";
 
 	// nope
 	if (!file_exists($lib)) {
-		exit("Looks like you don't have permission to write to '$lib'.\n");
+		exit("Looks like you don't have permission to write to '$bin' or '$share'.\n");
 	}
 
-// 775 the lib
-chmod($lib, 0755);
+// no place bin
+@file_put_contents($bin, $stub); chmod($bin, 0755);
 
-// symlink to bin and share
-symlink($lib, "/usr/share/pear/warhol.php");
-symlink($lib, "/usr/local/bin/warhol");
+var_dump( $share, $lib ); die;
+
+// symlink to share
+symlink($share, $lib);
 
 // tell them we're done
 exit("Warhol has been installed. Enjoy!\n");
+
+
+/// stub
+function stub($lib) {
+
+// bin stub
+$str = '#!/usr/bin/env php
+<?php
+///////////////////////////////////////////////////////////////////////
+/// (c) the.kuhl.co 2012 - author: travis kuhl (travis@kuhl.co)
+/// 
+/// Licensed under the Apache License, Version 2.0 (the "License"); 
+/// you may not use this work except in  compliance with the License. 
+/// You may obtain a copy of the License in the LICENSE file, or at:
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+/// 
+/// Unless required by applicable law or agreed to in writing, 
+/// software distributed under the License is distributed on an "AS IS" 
+/// BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either 
+/// express or implied. See the License for the specific language 
+/// governing permissions and limitations under the License.
+///////////////////////////////////////////////////////////////////////
+
+// include the lib
+require_once("'.$lib.'");
+
+';
+$str .= <<<'END'
+
+// if we're in cli, load it
+// otherwise we're just including the phar
+if ('cli' === php_sapi_name()) {
+
+    // init
+    warhol::init();
+
+    // run cli
+    warhol::cli();
+
+}
+else {
+	exit("Unable to run!");
+}
+
+END;
+return $str;
+}
