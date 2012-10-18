@@ -14,6 +14,10 @@ class client extends plugin {
 	public function init($cfg=array()) {
 		$this->cfg = $cfg;
 
+		if (is_array($cfg['manifest'])) {
+			$cfg['manifest'] = $cfg['manifest'][$cfg['env']];
+		}
+
 		// manifest
 		$file = realpath($cfg['manifest']);
 
