@@ -45,8 +45,9 @@ class build extends cmd {
 			$f = $this->finfo($path);
 
 			// hasn't changed and has been built
-			if ($file['bid'] != false AND $f['md5'] == $file['md5']) {
-				continue;
+			if (!isset($opts['force']) AND $file['bid'] != false AND $f['md5'] == $file['md5']) {
+				echo "skipped {$file['rel']}\n";
+				continue;				
 			}
 
 			// update the bid
@@ -58,6 +59,8 @@ class build extends cmd {
 			// files updated
 			$update[] = $f['id'];
 
+			echo "added {$file['rel']}\n";
+
 		}
 
 		// no updates
@@ -66,7 +69,7 @@ class build extends cmd {
 		}
 
 		// no tar
-		if (!isset($opts['-no-tar'])) {
+		if (!isset($opts['no-tar'])) {
 
 			// tmp
 			$tmp = "/tmp/w".time(); mkdir($tmp);
@@ -138,6 +141,7 @@ class build extends cmd {
 
 		} // end no tar
 
+		echo "added ".count($update)." to the manfiest\n";
 
 		// what was updated		
 		$this->manifest->set('files', $update, 'updated');
@@ -146,8 +150,9 @@ class build extends cmd {
 		$this->manifest->set('bid', $bid);		
 
 		// also write the manifest somewhere
-		if (isset($opts['-m'])) {
-			copy($this->manifest->getFile(),  $opts['-m']);
+		if (isset($opts['m'])) {
+			echo "wrote manifest to {$opts['m']}\n";
+			copy($this->manifest->getFile(),  $opts['m']);
 		}
 
 		// tar

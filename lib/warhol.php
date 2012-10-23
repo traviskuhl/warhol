@@ -113,7 +113,7 @@ namespace warhol {
 		// our version
 		const VERSION = "dev";
 
-		private $manifest = false;		
+		private $manifest = false;
 		private $client = false;
 		private $user = array();
 
@@ -208,12 +208,13 @@ namespace warhol {
 		/// @param $ext array of file exstensions to handle
 		/// @return warhol instance
 		////////////////////////////////////////////
-	    public function formator($name, $class, $exts) {
+	    public function formator($name, $class, $exts, $weight=1) {
 	    	foreach ($exts as $ext) {
 	    		$this->formators[$name] = array(
 	    			'class' => $class,
 	    			'instance' => false,
-	    			'ext' => $exts
+	    			'ext' => $exts,
+	    			'weight' => $weight
 	    		);
 	    	}
 	    	return $this;
@@ -228,31 +229,34 @@ namespace warhol {
 	    public function getFormators($by, $what) {
 	    	$formators = array();
 	    	if ($by == 'name') {
-	    		ksort($what);
 	    		foreach ($what as $name => $x) {
-	    			$formators[] = $name;
+	    			$formators[$name] = $x;
 	    		}
 	    	}
 	    	else {
 	    		foreach ($this->formators as $name => $f) {
 	    			if (in_array($what, $f['ext'])) {
-	    				$formators[] = $name;
+	    				$formators[$name] = $f['weight'];
 	    			}
-	    		}
+	    		}	    		
 	    	}
 
+	    	// arsort
+	    	asort($formators);
+
 	    	// loop
-	    	foreach ($formators as $i => $name) {
+	    	foreach ($formators as $name => $i) {
 		    	// no formator return the false
 		    	if (!array_key_exists($name, $this->formators)) {
-		    		unset($formators[$i]);
+		    		unset($formators[$name]);
 		    		continue;
 	    		}
 		    	if (!$this->formators[$name]['instance']) {
 		    		$this->formators[$name]['instance'] = new $this->formators[$name]['class'];
 		    	}
-		    	$formators[$i] = $this->formators[$name]['instance'];
+		    	$formators[$name] = $this->formators[$name]['instance'];
 		    }
+
 		    return $formators;
 	    }
 
@@ -305,35 +309,35 @@ namespace warhol {
 		public function curl($url, $params=array(), $method="GET") {
 	        // create a new cURL resource
 	        $ch = curl_init();
-	    
+
 	        // url is rel
 	       	if ($method == 'GET') {
 	            $url .= '?'.http_build_query($params);
 	        }
-	        
+
 	        // set URL and other appropriate options
 	        curl_setopt($ch, CURLOPT_URL, $url);
 	        curl_setopt($ch, CURLOPT_HEADER, false);
-	        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);  
-	        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);          
+	        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 	        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
 	        if ($method == 'POST') {
 	            curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
 	        }
-                                         
+
 	        // grab URL and pass it to the browser
 	        $resp = curl_exec($ch);
-	        
+
 	        $i = curl_getinfo($ch);
-	        
+
 	        // close cURL resource, and free up system resources
-	        curl_close($ch);  
+	        curl_close($ch);
 
 	        if ($i['content_type'] == 'text/javascript') {
 	        	$resp = json_decode($resp, true);
 	        }
-	        
+
 	        return array($resp, $i);
 
 

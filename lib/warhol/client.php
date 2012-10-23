@@ -32,6 +32,11 @@ class client extends plugin {
 		// root
 		$this->root = realpath($root);
 
+			// root already has a .warhol
+			if (stripos($this->root, '.warhol') !== false) {
+				$this->root = rtrim(str_replace(".warhol", '', $this->root),'/');
+			}
+
 		// manifest
 		$this->_manifest = new db($file);		
 

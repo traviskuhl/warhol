@@ -52,6 +52,7 @@ class add extends cmd {
 			// add our files
 			foreach (iterator_to_array($regex) as $file) {
 				if (is_file($file[0])) {
+					echo 'Added '.$file[0]."\n";
 					$files[] = $file[0];
 				}
 			}

@@ -4,7 +4,7 @@ namespace warhol\formator {
 use \warhol;
 
 // style shee
-warhol::formator('style', '\warhol\formator\cssMin', array('css'));
+warhol::formator('style', '\warhol\formator\cssMin', array('css'), 100);
 
 class cssMin extends \warhol\formator {
 

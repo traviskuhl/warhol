@@ -28,7 +28,8 @@ class file extends asset implements \ArrayAccess {
 			return $this->tokenize($this->base->cfg['url']['http'] . $this->getBuildPath());
 		}
 		else {
-			return rtrim($this->base->cfg['url']['local'],'/').$this->file['rel'];
+
+			return rtrim($this->base->cfg['url']['local'],'/').$this->file['rel'] . "?" . filemtime($this->base->root.$this->file['rel']);
 		}
 	}
 
@@ -53,7 +54,6 @@ class file extends asset implements \ArrayAccess {
 		else {
 			$formators = warhol::getFormators('ext', $this->file['ext']);
 		}
-
 
 		// content
 		$content = $this->getContent();

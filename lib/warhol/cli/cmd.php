@@ -26,17 +26,17 @@ class cmd {
 			$this->init();
 		}
 
-	}	
+	}
 
 	////////////////////////////////////////////
-	/// @brief any methods called that aren't 
-	///			defined are passed to base	
+	/// @brief any methods called that aren't
+	///			defined are passed to base
 	///
 	/// @param $name name of function
 	/// @param $args array of arguments
 	/// @return result || false
 	////////////////////////////////////////////
-	public function __call($name, $args=array()) {	
+	public function __call($name, $args=array()) {
 		if (method_exists($this, $name)) {
 			return call_user_func_array(array($this, $name), $args);
 		}
@@ -111,14 +111,14 @@ class cmd {
 		if (stripos($content, '@warhol ') === false) {
 			return array(array(), array());
 		}
-		
+
 		// hold for more
 		$settings = $rollups = array();
 
 		// check for each setting
 		if (preg_match_all('#warhol ([^\s]+)=([^\s]+)#i', $content, $matches, PREG_SET_ORDER)) {
 			foreach ($matches as $match) {
-				$sname = $match[1];				
+				$sname = $match[1];
 				foreach (explode(',', trim($match[2])) as $item) {
 					if (stripos($item, ':')===false) { $item .= ':'; }
 					list($name, $val) = explode(':', $item);
@@ -138,7 +138,7 @@ class cmd {
 
 	}
 
-	public function getConfig($root=false){ 
+	public function getConfig($root=false){
 
 		// use cwd
 		if (!$root) {$root = realpath(getcwd());}
@@ -159,7 +159,7 @@ class cmd {
 
 		// json
 		$this->config = new warhol\db("$root/.warhol/config");
-		$this->manifest = new warhol\db("$root/.warhol/manifest");	
+		$this->manifest = new warhol\db("$root/.warhol/manifest");
 
 	}
 
@@ -167,7 +167,7 @@ class cmd {
 		return (array_key_exists($idx, $this->commands) ? $this->commands[$idx] : $default);
 	}
 
-	/// 
+	///
 	public function setCommands($cmds) {
 		$this->commands = $cmds;
 		return $this;
@@ -179,7 +179,7 @@ class cmd {
 
 	public function ask($text, $default=false, $tf=true) {
 		echo "$text ".($default ? "[$default]" : "").": ";
-		$a = trim(fgets(STDIN));		
+		$a = trim(fgets(STDIN));
 		if (empty($a) OR $a == "") { $a = $default;}
 		if ($tf) {
 	 		switch(strtolower($a{0})) {

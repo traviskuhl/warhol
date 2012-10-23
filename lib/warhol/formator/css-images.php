@@ -4,7 +4,7 @@ namespace warhol\formator;
 use \warhol;
 
 // style shee
-warhol::formator('css-images', '\warhol\formator\cssImages', array('css'));
+warhol::formator('css-images', '\warhol\formator\cssImages', array('css'), 99);
 
 class cssImages extends \warhol\formator {
 
@@ -20,8 +20,11 @@ class cssImages extends \warhol\formator {
 		// find all images
 		if (preg_match_all("#url\(([^\)]+)\)#", $body, $matches, PREG_SET_ORDER)) {
 			foreach ($matches as $match) {
-				$val = trim($match[1],"'\"/");
-				$fpath = str_replace($croot, '', realpath($root."/".$val));				
+				$val = trim($match[1],"'\"/"); 
+				if (stripos($val, '?') !== false) {
+					list($val, $x) = explode('?', $val);
+				}
+				$fpath = str_replace($croot, '', realpath($root."/".$val));
 				// see if we have this file
 				$f = $this->getManifest()->get('files')->get(md5($fpath));
 				if ($f) {
@@ -34,5 +37,5 @@ class cssImages extends \warhol\formator {
 		return $body;
 
 	}
-	
+
 }
