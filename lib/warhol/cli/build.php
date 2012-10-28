@@ -152,7 +152,7 @@ class build extends cmd {
 		// also write the manifest somewhere
 		if (isset($opts['m'])) {
 			echo "wrote manifest to {$opts['m']}\n";
-			copy($this->manifest->getFile(),  $opts['m']);
+			file_put_contents($opts['m'], json_encode($this->manifest->getData()));
 		}
 
 		// tar
