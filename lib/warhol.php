@@ -159,12 +159,20 @@ namespace warhol {
 
 			// only init once
 			if ($this->_init) {return;}
+
+			// load
+			$load = array();
 			
 			// we are in a phar, so glob does not work
 			// need to use directory it to get our files
 			foreach (new \DirectoryIterator(WARHOL_LIB_ROOT.'/warhol/formator/') as $file) {
-				$this->load($file->getPathname());
+				if (!$file->isDot()) {
+					$load[] = $file->getPathname();
+				}
 			}
+
+			// load them
+			$this->load($load);
 
 			// init
 			$this->_init = true;
