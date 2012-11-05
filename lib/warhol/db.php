@@ -39,7 +39,7 @@ class db {
 	}
 
 	public function get($ns='default', $name=false) {
-		$ns = new \taurus\db\item($ns, $this);
+		$ns = new \warhol\db\item($ns, $this);
 		return ($name ? $ns->get($name) : $ns);
 	}
 
@@ -73,7 +73,7 @@ class db {
 }
 
 
-namespace taurus\db;
+namespace warhol\db;
 
 class item {
 	private $root;
