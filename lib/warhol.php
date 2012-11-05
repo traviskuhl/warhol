@@ -162,7 +162,7 @@ namespace warhol {
 			
 			// we are in a phar, so glob does not work
 			// need to use directory it to get our files
-			foreach (new DirectoryIterator(WARHOL_LIB_ROOT.'/warhol/formator/') as $file) {
+			foreach (new \DirectoryIterator(WARHOL_LIB_ROOT.'/warhol/formator/') as $file) {
 				$this->load($file->getPathname());
 			}
 
