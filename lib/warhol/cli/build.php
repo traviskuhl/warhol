@@ -16,7 +16,7 @@ class build extends cmd {
 		$root = false; 
 
 		// get our root
-		$this->getConfig($root);
+		$this->getConfig($root);		
 
 		// files
 		$files = $this->manifest->get('files')->all();
@@ -61,15 +61,10 @@ class build extends cmd {
 
 			echo "added {$file['rel']}\n";
 
-		}
-
-		// no updates
-		if (count($update) === 0) {
-			return $this->end("Everything is up-to-date");
-		}
+		}		
 
 		// no tar
-		if (!isset($opts['no-tar'])) {
+		if (!isset($opts['no-tar']) AND count($update) > 0) {
 
 			// tmp
 			$tmp = "/tmp/w".time(); mkdir($tmp);
@@ -143,8 +138,9 @@ class build extends cmd {
 
 		echo "added ".count($update)." to the manfiest\n";
 
+
 		// what was updated		
-		$this->manifest->set('files', $update, 'updated');
+		$this->manifest->setByNamespace('updated', 'files', $update);
 
 		// set bid
 		$this->manifest->set('bid', $bid);		
